@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    image: worktable-server:latest
+    container_name: worktable-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8788}:8788"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8788"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      ACCESS_TTL: ${ACCESS_TTL:-15m}
+      REFRESH_TTL_DAYS: ${REFRESH_TTL_DAYS:-30}
+      DB_PATH: /app/data/worktable.json
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,https://worker-table.netlify.app}
+      DEV_FAKE_MAIL: ${DEV_FAKE_MAIL:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Worktable <noreply@worktable.local>}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8788/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

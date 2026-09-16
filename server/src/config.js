@@ -10,8 +10,12 @@ function bool(v, d = false) {
   return String(v).toLowerCase() === 'true' || v === '1'
 }
 
+const isProd = process.env.NODE_ENV === 'production'
+
 export const config = {
   port: Number(process.env.PORT || 8788),
+  // Public deploys need 0.0.0.0; keep loopback-only for local dev unless overridden.
+  host: process.env.HOST || (isProd ? '0.0.0.0' : '127.0.0.1'),
   jwtSecret: process.env.JWT_SECRET || '',
   accessTtl: process.env.ACCESS_TTL || '15m',
   refreshTtlDays: Number(process.env.REFRESH_TTL_DAYS || 30),

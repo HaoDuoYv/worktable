@@ -22,3 +22,18 @@ npm run dev
 ## API
 
 见 `docs/CLOUD_SYNC_PLAN.md` §3–§4。
+
+## Docker 部署
+
+```bash
+cd server
+cp .env.example .env   # 填写 JWT_SECRET、SMTP_*
+docker compose up -d --build
+curl http://127.0.0.1:8788/health
+```
+
+- 数据持久化：`./data/worktable.json`（compose 挂载 `./data`）
+- 生产必须设置强随机 `JWT_SECRET`，并按前端域名配置 `CORS_ORIGIN`
+- 桌面端 Origin `http://127.0.0.1:*` 由服务端 CORS 自动放行
+- 停止：`docker compose down`；看日志：`docker compose logs -f api`
+

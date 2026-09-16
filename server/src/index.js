@@ -8,13 +8,35 @@ import { authRouter } from './routesAuth.js'
 import { syncRouter } from './routesSync.js'
 import './db.js'
 
+const allowedExact = config.corsOrigin
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+/** Allow listed web origins + any local desktop shell (Electron uses 127.0.0.1:random). */
+function corsOrigin(origin, callback) {
+  if (!origin) {
+    callback(null, true)
+    return
+  }
+  if (allowedExact.includes(origin)) {
+    callback(null, true)
+    return
+  }
+  if (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(origin)) {
+    callback(null, true)
+    return
+  }
+  callback(new Error(`Not allowed by CORS: ${origin}`))
+}
+
 const app = express()
 app.set('trust proxy', 1)
 
 app.use(helmet())
 app.use(
   cors({
-    origin: config.corsOrigin.split(',').map((s) => s.trim()),
+    origin: corsOrigin,
     credentials: true,
   }),
 )
@@ -43,7 +65,8 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: '服务器内部错误' })
 })
 
-app.listen(config.port, '127.0.0.1', () => {
-  console.log(`Worktable API http://127.0.0.1:${config.port}`)
+app.listen(config.port, config.host, () => {
+  const displayHost = config.host === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : config.host
+  console.log(`Worktable API http://${displayHost}:${config.port}`)
   console.log(`CORS origin: ${config.corsOrigin}`)
 })
