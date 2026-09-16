@@ -16,18 +16,72 @@ export interface AuthSession extends AuthTokens {
 }
 
 const API_KEY = 'worktable.api.baseUrl'
+const MODE_KEY = 'worktable.api.mode'
 const SESSION_KEY = 'worktable.auth.session'
 
-export function loadApiBase(): string {
+/** Built-in Worktable cloud endpoint — never shown in the UI. */
+const OFFICIAL_API_BASE = 'https://dquapi.qzz.io'
+
+export type ApiEndpointMode = 'official' | 'custom'
+
+function readStorage(key: string): string | null {
   try {
-    return localStorage.getItem(API_KEY) || 'http://127.0.0.1:8788'
+    return localStorage.getItem(key)
   } catch {
-    return 'http://127.0.0.1:8788'
+    return null
   }
 }
 
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadApiMode(): ApiEndpointMode {
+  const mode = readStorage(MODE_KEY)
+  if (mode === 'official' || mode === 'custom') return mode
+  const stored = readStorage(API_KEY)
+  if (!stored) return 'official'
+  // Migrate legacy local-dev default to official product endpoint.
+  if (stored === 'http://127.0.0.1:8788' || stored === OFFICIAL_API_BASE) return 'official'
+  return 'custom'
+}
+
+export function loadCustomApiBase(): string {
+  const stored = readStorage(API_KEY) || ''
+  if (!stored || stored === OFFICIAL_API_BASE || stored === 'http://127.0.0.1:8788') return ''
+  return stored.replace(/\/+$/, '')
+}
+
+export function loadApiBase(): string {
+  if (loadApiMode() === 'official') return OFFICIAL_API_BASE
+  return loadCustomApiBase() || OFFICIAL_API_BASE
+}
+
+export function saveApiEndpoint(mode: ApiEndpointMode, customUrl?: string): void {
+  writeStorage(MODE_KEY, mode)
+  if (mode === 'official') {
+    writeStorage(API_KEY, OFFICIAL_API_BASE)
+    return
+  }
+  writeStorage(API_KEY, (customUrl ?? loadCustomApiBase()).replace(/\/+$/, ''))
+}
+
+/** @deprecated prefer saveApiEndpoint */
 export function saveApiBase(url: string) {
-  localStorage.setItem(API_KEY, url.replace(/\/+$/, ''))
+  const cleaned = url.replace(/\/+$/, '')
+  if (!cleaned || cleaned === OFFICIAL_API_BASE) {
+    saveApiEndpoint('official')
+    return
+  }
+  if (cleaned === 'http://127.0.0.1:8788') {
+    saveApiEndpoint('official')
+    return
+  }
+  saveApiEndpoint('custom', cleaned)
 }
 
 export function loadSession(): AuthSession | null {

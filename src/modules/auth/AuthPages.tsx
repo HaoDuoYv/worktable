@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/Button'
 import { useAuth } from './AuthContext'
-import { saveApiBase, loadApiBase } from './api'
+import { ApiEndpointField } from './ApiEndpointField'
 
 function AuthHeader({ title, desc }: { title: string; desc?: string }) {
   return (
@@ -27,7 +27,6 @@ export function LoginPage() {
   const nav = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [api, setApi] = useState(() => loadApiBase())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,7 +34,6 @@ export function LoginPage() {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    saveApiBase(api)
     try {
       await login(email.trim(), password)
       nav('/settings')
@@ -50,10 +48,7 @@ export function LoginPage() {
     <>
       <AuthHeader title="登录" desc="登录后可将本地数据同步到云端，换设备拉取。" />
       <form className="auth-form" onSubmit={onSubmit}>
-        <label className="auth-field">
-          <span>API 地址</span>
-          <input value={api} onChange={(e) => setApi(e.target.value)} placeholder="http://127.0.0.1:3000" />
-        </label>
+        <ApiEndpointField />
         <label className="auth-field">
           <span>邮箱</span>
           <input
@@ -104,13 +99,11 @@ export function RegisterPage() {
   const [codeBusy, setCodeBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
-  const [api, setApi] = useState(() => loadApiBase())
 
   const sendCode = async () => {
     setCodeBusy(true)
     setError(null)
     setInfo(null)
-    saveApiBase(api)
     try {
       const { sendCode: apiSend } = await import('./api')
       const res = await apiSend(email.trim(), 'register')
@@ -131,7 +124,6 @@ export function RegisterPage() {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    saveApiBase(api)
     try {
       await register(email.trim(), password, code.trim())
       nav('/settings')
@@ -146,10 +138,7 @@ export function RegisterPage() {
     <>
       <AuthHeader title="注册" desc="邮箱 + 6 位验证码。密码至少 8 位。" />
       <form className="auth-form" onSubmit={onSubmit}>
-        <label className="auth-field">
-          <span>API 地址</span>
-          <input value={api} onChange={(e) => setApi(e.target.value)} placeholder="http://127.0.0.1:3000" />
-        </label>
+        <ApiEndpointField />
         <label className="auth-field">
           <span>邮箱</span>
           <input
@@ -220,7 +209,6 @@ export function ForgotPasswordPage() {
   const [codeBusy, setCodeBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
-  const [api, setApi] = useState(() => loadApiBase())
 
   const sendResetCode = async () => {
     if (!email.trim()) {
@@ -231,7 +219,6 @@ export function ForgotPasswordPage() {
     setError(null)
     setInfo(null)
     setDevCode(null)
-    saveApiBase(api)
     try {
       const { sendCode: apiSend } = await import('./api')
       const res = await apiSend(email.trim(), 'reset')
@@ -257,7 +244,6 @@ export function ForgotPasswordPage() {
     setBusy(true)
     setError(null)
     setInfo(null)
-    saveApiBase(api)
     try {
       const { resetPassword } = await import('./api')
       const res = await resetPassword(email.trim(), password, code.trim())
@@ -277,10 +263,7 @@ export function ForgotPasswordPage() {
         desc="通过邮箱验证码重置密码。重置后所有设备需重新登录。"
       />
       <form className="auth-form" onSubmit={onSubmit}>
-        <label className="auth-field">
-          <span>API 地址</span>
-          <input value={api} onChange={(e) => setApi(e.target.value)} placeholder="http://127.0.0.1:3000" />
-        </label>
+        <ApiEndpointField />
         <label className="auth-field">
           <span>注册邮箱</span>
           <input
