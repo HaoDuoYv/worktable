@@ -6,6 +6,10 @@ import path from 'node:path'
 export default defineConfig({
   base: './',
   plugins: [react()],
+  define: {
+    // Strip algorithm-visualizer phone-home (axios/opn require) at build time.
+    'process.env.ALGORITHM_VISUALIZER': JSON.stringify('1'),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -17,9 +21,15 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  // Keep Tracer class names so Commander methods stay Array1DTracer/LogTracer/...
+  esbuild: {
+    keepNames: true,
+  },
   build: {
     target: 'es2022',
     outDir: 'dist',
     emptyOutDir: true,
+    // prevent aggressive name mangling of the AV library chunk
+    minify: 'esbuild',
   },
 })
