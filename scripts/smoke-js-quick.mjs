@@ -1,0 +1,18 @@
+import { chromium } from 'playwright'
+
+const browser = await chromium.launch({ headless: true })
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+await page.goto('http://localhost:5173/algorithms', { waitUntil: 'networkidle' })
+await page.waitForTimeout(1000)
+await page.getByRole('radio', { name: 'JavaScript' }).click()
+await page.waitForTimeout(600)
+const first = await page.locator('.algo-item__title').first().textContent()
+console.log('first', first)
+await page.getByRole('button', { name: '运行' }).click()
+await page.waitForTimeout(2500)
+const cells = await page.locator('.viz-array1d .viz-cell').count()
+const count = await page.locator('.player-bar__count').textContent()
+console.log('js cells', cells, count)
+await browser.close()
+if (cells < 1) process.exit(1)
+console.log('js ok')

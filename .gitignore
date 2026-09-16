@@ -1,0 +1,83 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+release/
+build/
+*.tsbuildinfo
+
+# Electron / packaging
+# (release/ already ignored above)
+
+# Local env & secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+vite.log
+server/err.log
+server/out.log
+server/server.log
+
+# TypeScript incremental
+*.tsbuildinfo
+
+# Local runtime data (JSON store)
+server/data/
+
+# Scratch images / local QA shots
+screenshots/
+*.jpg
+!public/**/*.jpg
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Test / coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Cache
+.vite/
+.cache/
+.eslintcache
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local data dumps (if any)
+*.sqlite
+*.sqlite3
+data/local/
+
+# MiMo / agent local
+.mimocode/
+
+# Vendored third-party clones (use npm dependencies instead)
+vendor/

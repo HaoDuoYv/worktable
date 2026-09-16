@@ -1,0 +1,311 @@
+/**
+ * Worktable design tokens — dual theme
+ * Dark: Developer Tool / IDE
+ * Light: Swiss-minimal slate for daylight work
+ *
+ * 约束来源：UI_REDESIGN_BLUEPRINT §A —— WCAG 对比度硬约束
+ *   正文 text on ink-950/panel     ≥ 4.5:1
+ *   次要 text-muted on panel       ≥ 4.5:1
+ *   text-subtle 仅装饰/元信息      ≥ 3:1
+ *   焦点环 focus 对相邻底色         ≥ 3:1
+ *   禁用态 opacity 0.55 + 可读字号
+ */
+
+:root {
+  /* type & layout (shared) */
+  --font-ui: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+  --font-mono: Consolas, 'Cascadia Code', 'SF Mono', monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --nav-width: 208px;
+  --header-height: 48px;
+
+  --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur-mid: 220ms;
+  --dur-slow: 300ms;
+
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-2: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+/* —— Dark (default, IDE) —— */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ink-950: #0b1220;
+  --ink-900: #111827;
+  --ink-800: #1f2937;
+  --ink-700: #374151;
+  --line: #374151;
+  --line-strong: #4b5563;
+
+  --text: #f9fafb;
+  --text-muted: #d1d5db;
+  --text-subtle: #9ca3af;
+
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.16);
+  --accent-fg: #0b1220;
+  --signal: #34d399;
+  --signal-soft: rgba(52, 211, 153, 0.16);
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --focus: #93c5fd;
+
+  --diff-add-bg: #14301f;
+  --diff-add-fg: #86efac;
+  --diff-del-bg: #331818;
+  --diff-del-fg: #fca5a5;
+
+  --panel: #111827;
+  --panel-2: #1f2937;
+  --canvas: #030712;
+  --elevated: #1f2937;
+}
+
+/* —— Light (day / paper) —— */
+[data-theme='light'] {
+  color-scheme: light;
+
+  --ink-950: #f3f4f6;
+  --ink-900: #ffffff;
+  --ink-800: #f9fafb;
+  --ink-700: #e5e7eb;
+  --line: #d1d5db;
+  --line-strong: #9ca3af;
+
+  --text: #111827;
+  --text-muted: #4b5563;
+  --text-subtle: #6b7280;
+
+  --accent: #1d4ed8;
+  --accent-soft: rgba(29, 78, 216, 0.1);
+  --accent-fg: #ffffff;
+  --signal: #047857;
+  --signal-soft: rgba(4, 120, 87, 0.12);
+  --warn: #b45309;
+  --danger: #dc2626;
+  --focus: #1d4ed8;
+
+  --diff-add-bg: #dcfce7;
+  --diff-add-fg: #14532d;
+  --diff-del-bg: #fee2e2;
+  --diff-del-fg: #7f1d1d;
+
+  --panel: #ffffff;
+  --panel-2: #f9fafb;
+  --canvas: #e5e7eb;
+  --elevated: #ffffff;
+
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-2: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--ink-950);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color var(--dur-mid) var(--ease-ui), color var(--dur-mid) var(--ease-ui);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 10000;
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: top var(--dur-fast) var(--ease-ui);
+}
+
+.skip-link:focus {
+  top: 12px;
+  text-decoration: none;
+}
+
+/* —— Radial Theme Transition (View Transitions) —— */
+@supports (view-transition-name: root) {
+  html.vt-radial::view-transition-old(root),
+  html.vt-radial::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  html.vt-radial::view-transition-old(root) {
+    z-index: 1;
+  }
+
+  html.vt-radial::view-transition-new(root) {
+    z-index: 2;
+    animation: vt-reveal var(--vt-dur, 420ms) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+@keyframes vt-reveal {
+  from {
+    clip-path: circle(0px at var(--vt-x, 50%) var(--vt-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--vt-r, 150vmax) at var(--vt-x, 50%) var(--vt-y, 50%));
+  }
+}
+
+/* 克隆遮罩兜底层：禁止影响布局与交互 */
+.theme-clone-overlay {
+  font-family: var(--font-ui);
+}
+
+.theme-clone-overlay * {
+  pointer-events: none !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.vt-radial::view-transition-old(root),
+  html.vt-radial::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+/* 克隆层必须独立声明旧主题变量，避免继承 html 上的新主题 */
+.theme-clone-overlay[data-theme='dark'] {
+  color-scheme: dark;
+  --ink-950: #0b1220;
+  --ink-900: #111827;
+  --ink-800: #1f2937;
+  --ink-700: #374151;
+  --line: #374151;
+  --line-strong: #4b5563;
+  --text: #f9fafb;
+  --text-muted: #d1d5db;
+  --text-subtle: #9ca3af;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.16);
+  --accent-fg: #0b1220;
+  --signal: #34d399;
+  --signal-soft: rgba(52, 211, 153, 0.16);
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --focus: #93c5fd;
+  --diff-add-bg: #14301f;
+  --diff-add-fg: #86efac;
+  --diff-del-bg: #331818;
+  --diff-del-fg: #fca5a5;
+  --panel: #111827;
+  --panel-2: #1f2937;
+  --canvas: #030712;
+  --elevated: #1f2937;
+  background: var(--ink-950);
+  color: var(--text);
+}
+
+.theme-clone-overlay[data-theme='light'] {
+  color-scheme: light;
+  --ink-950: #f3f4f6;
+  --ink-900: #ffffff;
+  --ink-800: #f9fafb;
+  --ink-700: #e5e7eb;
+  --line: #d1d5db;
+  --line-strong: #9ca3af;
+  --text: #111827;
+  --text-muted: #4b5563;
+  --text-subtle: #6b7280;
+  --accent: #1d4ed8;
+  --accent-soft: rgba(29, 78, 216, 0.1);
+  --accent-fg: #ffffff;
+  --signal: #047857;
+  --signal-soft: rgba(4, 120, 87, 0.12);
+  --warn: #b45309;
+  --danger: #dc2626;
+  --focus: #1d4ed8;
+  --diff-add-bg: #dcfce7;
+  --diff-add-fg: #14532d;
+  --diff-del-bg: #fee2e2;
+  --diff-del-fg: #7f1d1d;
+  --panel: #ffffff;
+  --panel-2: #f9fafb;
+  --canvas: #e5e7eb;
+  --elevated: #ffffff;
+  background: var(--ink-950);
+  color: var(--text);
+}
+
+.theme-clone-overlay {
+  font-family: var(--font-ui);
+}
