@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuth } from '@/modules/auth/AuthContext'
 import { Icon, WorktableMark, type IconName } from '@/components/Icon'
+import { IconButton } from '@/components/IconButton'
 
 const NAV_ITEMS: {
   to: string
@@ -76,14 +77,18 @@ export function AppShell({ children }: { children?: ReactNode }) {
               登录
             </Link>
           ) : (
-            <button
-              type="button"
-              className="app-shell__login-link"
-              title={user?.email}
-              onClick={() => void logout()}
-            >
-              {user?.displayName || user?.email}
-            </button>
+            <div className="app-shell__account">
+              <Link
+                to="/settings"
+                className="app-shell__login-link"
+                title={user?.email ? `账号：${user.email}` : '账号设置'}
+              >
+                {user?.displayName || user?.email}
+              </Link>
+              <IconButton label="退出登录" onClick={() => void logout()}>
+                <Icon name="logout" size={16} />
+              </IconButton>
+            </div>
           )}
           <ThemeToggle />
         </div>

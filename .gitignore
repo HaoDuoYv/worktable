@@ -84,3 +84,5 @@ vendor/
 
 # Local generation scratch
 generated-*.png
+
+server.tar

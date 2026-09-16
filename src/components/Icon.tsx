@@ -22,6 +22,7 @@ export type IconName =
   | 'check'
   | 'code'
   | 'eye'
+  | 'logout'
 
 export type IconProps = SVGProps<SVGSVGElement> & {
   name: IconName
@@ -142,6 +143,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M2.75 12s3.5-6.25 9.25-6.25S21.25 12 21.25 12 17.75 18.25 12 18.25 2.75 12 2.75 12Z" strokeLinejoin="round" />
       <circle cx="12" cy="12" r="2.75" />
+    </>
+  ),
+  logout: (
+    <>
+      <path d="M10 7V5.5A1.5 1.5 0 0 1 11.5 4h5A1.5 1.5 0 0 1 18 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 10 18.5V17" strokeLinecap="round" />
+      <path d="M14 12H4.5M8 8.5 4.5 12 8 15.5" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
 }

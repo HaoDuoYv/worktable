@@ -74,6 +74,7 @@
 .btn--busy {
   position: relative;
   color: transparent;
+  pointer-events: none;
 }
 
 .btn--busy::after {
@@ -82,9 +83,24 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border: 2px solid color-mix(in srgb, var(--text) 28%, transparent);
   border-top-color: var(--text);
   animation: btn-spin 0.7s linear infinite;
+}
+
+.btn--primary.btn--busy::after {
+  border: 2px solid color-mix(in srgb, var(--accent-fg) 35%, transparent);
+  border-top-color: var(--accent-fg);
+}
+
+.icon-btn.btn--busy::after {
+  border-top-color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn--busy::after {
+    animation-duration: 1.4s;
+  }
 }
 
 @keyframes btn-spin {
