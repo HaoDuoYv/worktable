@@ -116,7 +116,7 @@ export function RegisterPage() {
       const res = await apiSend(email.trim(), 'register')
       if (res.devCode) {
         setDevCode(res.devCode)
-        setInfo('开发模式验证码已生成（未配置 SMTP）')
+        setInfo('本地验证码已生成（未配置邮件服务）')
       } else {
         setInfo('验证码已发送到邮箱，请查收')
       }
@@ -189,7 +189,7 @@ export function RegisterPage() {
           </Button>
         </div>
         {devCode ? (
-          <p className="auth-devcode">开发验证码：{devCode}</p>
+          <p className="auth-devcode">本地验证码：{devCode}</p>
         ) : null}
         {info ? <p className="auth-info">{info}</p> : null}
         <AuthError message={error} />
@@ -237,7 +237,7 @@ export function ForgotPasswordPage() {
       const res = await apiSend(email.trim(), 'reset')
       if (res.devCode) {
         setDevCode(res.devCode)
-        setInfo('开发模式验证码已生成（未配置 SMTP）')
+        setInfo('本地验证码已生成（未配置邮件服务）')
       } else {
         setInfo('重置验证码已发送到邮箱')
       }
@@ -308,7 +308,7 @@ export function ForgotPasswordPage() {
             发送验证码
           </Button>
         </div>
-        {devCode ? <p className="auth-devcode">开发验证码：{devCode}</p> : null}
+        {devCode ? <p className="auth-devcode">本地验证码：{devCode}</p> : null}
         <label className="auth-field">
           <span>新密码（≥8 位）</span>
           <input

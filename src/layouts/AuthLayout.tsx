@@ -1,5 +1,6 @@
 import { Outlet, Link } from 'react-router-dom'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { WorktableMark } from '@/components/Icon'
 
 export function AuthLayout() {
   return (
@@ -11,7 +12,7 @@ export function AuthLayout() {
       <header className="auth-layout__header" aria-label="品牌">
         <Link to="/" className="auth-layout__brand">
           <span className="auth-layout__brand-mark" aria-hidden="true">
-            WT
+            <WorktableMark size={26} />
           </span>
           <span className="auth-layout__brand-text">Worktable</span>
         </Link>
@@ -24,9 +25,7 @@ export function AuthLayout() {
         </div>
       </main>
 
-      <footer className="auth-layout__footer">
-        本地优先 · 数据默认只留在浏览器
-      </footer>
+      <footer className="auth-layout__footer">数据默认保存在本机浏览器</footer>
     </div>
   )
 }

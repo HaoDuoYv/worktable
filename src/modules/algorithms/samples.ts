@@ -58,7 +58,7 @@ export function makeCppBubbleSort(): Algorithm {
   return {
     id: 'cpp-bubble-sort',
     title: '冒泡排序（C++）',
-    description: '本地 g++/clang++ 运行；需启动 server-cpp。',
+    description: '使用本机 C++ 编译器运行；需在设置中配置编译器。',
     language: 'cpp',
     category: '排序',
     tags: ['cpp', 'sort'],

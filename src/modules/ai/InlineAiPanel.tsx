@@ -77,7 +77,7 @@ export function InlineAiPanel({
     async (text: string) => {
       if (!text.trim() || busy) return
       if (!isAiConfigured()) {
-        setError('先在设置里填写 API 地址与密钥，再使用 AI。')
+        setError('请先在设置中配置 AI 接口地址与密钥。')
         return
       }
       const userMsg: ChatMessage = {
@@ -209,7 +209,7 @@ export function InlineAiPanel({
           <div className="ai-float__messages" ref={listRef}>
             {messages.length === 0 && !busy ? (
               <p className="ai-float__empty">
-                {configured ? '直接提问，会带上当前上下文。' : '未配置 AI，请先在设置中填写 API。'}
+                {configured ? '提问时将附带当前页面上下文。' : '尚未配置 AI，请在设置中填写接口信息。'}
               </p>
             ) : null}
             {messages.map((m, i) => (

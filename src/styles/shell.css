@@ -36,17 +36,16 @@
 }
 
 .app-shell__brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--accent);
   display: grid;
   place-items: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--accent-fg);
   flex-shrink: 0;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+  line-height: 0;
+  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--accent) 28%, transparent));
+}
+
+.app-shell__brand-mark .worktable-mark {
+  display: block;
+  border-radius: 22%;
 }
 
 .app-shell__nav-label {
@@ -119,7 +118,13 @@
   display: grid;
   place-items: center;
   width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  line-height: 0;
+}
+
+.app-shell__nav-icon .icon {
+  display: block;
 }
 
 .app-shell__header {
@@ -277,16 +282,10 @@
 }
 
 .auth-layout__brand-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius);
-  background: var(--accent);
   display: grid;
   place-items: center;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--accent-fg);
   flex-shrink: 0;
+  line-height: 0;
 }
 
 .auth-layout__main {

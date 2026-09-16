@@ -81,3 +81,6 @@ data/local/
 
 # Vendored third-party clones (use npm dependencies instead)
 vendor/
+
+# Local generation scratch
+generated-*.png

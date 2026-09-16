@@ -164,7 +164,7 @@ export function AiPage() {
     async (sessionId: string, userText?: string) => {
       const settings = loadAiSettings()
       if (!isAiConfigured(settings)) {
-        setError('先在设置里填写 API 地址与密钥，再使用 AI。')
+        setError('请先在设置中配置 AI 接口地址与密钥。')
         return
       }
       const current = loadChatSessions().find((s) => s.id === sessionId)
@@ -235,7 +235,7 @@ export function AiPage() {
       <div className="page">
         <EmptyState
           title="尚未配置 AI"
-          text="先在设置里填写 API 地址与密钥，再使用 AI。支持 DeepSeek、通义、Kimi、Ollama 等兼容端点。"
+          text="请先在设置中配置 AI 接口地址与密钥。支持 DeepSeek、通义、Kimi、Ollama 等兼容端点。"
           actions={
             <Link to="/settings">
               <Button variant="primary">打开设置</Button>

@@ -3,6 +3,9 @@ import { ChipRow, type ChipOption } from '@/components/Chip'
 import { CodeEditor } from '@/components/CodeEditor'
 import { PlayerBar, type Speed } from '@/components/PlayerBar'
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
+import { Icon } from '@/components/Icon'
+import { SelectMenu } from '@/components/SelectMenu'
 import { Disclosure } from '@/components/Disclosure'
 import { AvEngine } from '@/core/av/engine'
 import { TracerPanel } from '@/core/av/renderers'
@@ -190,11 +193,11 @@ export function AlgorithmsLabPage() {
     [code, editorMode, selected],
   )
 
-  /** 静默：把源码转成可视化代码，不展示中间对话 */
+  /** Convert source to visualization code without opening the chat panel. */
   const silentVisualize = useCallback(async () => {
     if (!selected) return
     if (!isAiConfigured()) {
-      setError('先在设置里填写 API 地址与密钥，再使用 AI 可视化。')
+      setError('请先在设置中配置 AI 接口地址与密钥。')
       return
     }
     const src =
@@ -494,7 +497,7 @@ export function AlgorithmsLabPage() {
         editorMode === 'viz' ? code : (selected?.vizCode ?? '')
 
       if (!runCode.trim()) {
-        setError('可视化代码为空。可先编辑源码，再点「AI 可视化」生成。')
+        setError('可视化代码为空。可先编辑源码，再使用「生成可视化代码」。')
         return
       }
 
@@ -747,7 +750,7 @@ export function AlgorithmsLabPage() {
             <li className="algo-empty">没有匹配的算法</li>
           ) : null}
         </ul>
-        <div className="algo-lab__nav-foot">本地 IndexedDB · 可导出备份</div>
+        <div className="algo-lab__nav-foot">数据保存在本机，可导出备份</div>
       </aside>
 
       <section className="algo-lab__viz">
@@ -760,7 +763,7 @@ export function AlgorithmsLabPage() {
         <div className="algo-lab__canvas">
           {tracers.length === 0 ? (
             <div className="viz-placeholder">
-              <p>点击「运行」执行算法，逐步回放可视化。</p>
+              <p>运行算法并逐步查看可视化过程。</p>
               <p className="viz-placeholder__hint">支持 Array1D / Array2D / Log / Graph</p>
             </div>
           ) : (
@@ -804,35 +807,37 @@ export function AlgorithmsLabPage() {
             disabled={!selected}
           />
           <div className="algo-lab__editor-actions">
-            <span className="algo-lab__hint">{dirty ? '未保存' : '已同步'}</span>
-            <ChipRow
+            <span className="algo-lab__hint">{dirty ? '未保存' : '已保存'}</span>
+            <SelectMenu
               ariaLabel="编辑器模式"
-              options={[
-                { value: 'source' as const, label: '源码' },
-                { value: 'viz' as const, label: '可视化代码' },
+              items={[
+                { value: 'source' as const, label: '源码', icon: 'code', hint: '业务逻辑' },
+                { value: 'viz' as const, label: '可视化代码', icon: 'eye', hint: '运行时执行' },
               ]}
               value={editorMode}
               onChange={(m) => void switchEditorMode(m)}
             />
-            <Button
-              size="sm"
-              variant="primary"
+            <IconButton
+              label="保存"
               disabled={!selected || !dirty}
               onClick={() => void handleSave()}
             >
-              保存
-            </Button>
-            <Button size="sm" variant="ghost" disabled={!selected} onClick={() => void handleSaveAs()}>
-              另存为
-            </Button>
-            <Button size="sm" variant="ghost" disabled={!selected} onClick={() => void handleToggleFavorite()}>
-              {selected?.favorite ? '取消收藏' : '收藏'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
+              <Icon name="save" size={18} />
+            </IconButton>
+            <IconButton label="另存为副本" disabled={!selected} onClick={() => void handleSaveAs()}>
+              <Icon name="save-copy" size={18} />
+            </IconButton>
+            <IconButton
+              label={selected?.favorite ? '取消收藏' : '收藏'}
               disabled={!selected}
-              title="在本页打开 AI 问答"
+              aria-pressed={Boolean(selected?.favorite)}
+              onClick={() => void handleToggleFavorite()}
+            >
+              <Icon name={selected?.favorite ? 'star-filled' : 'star'} size={18} />
+            </IconButton>
+            <IconButton
+              label="AI 问答"
+              disabled={!selected}
               onClick={() => {
                 if (!selected) return
                 setAiAutoAsk(
@@ -841,25 +846,23 @@ export function AlgorithmsLabPage() {
                 setAiOpen(true)
               }}
             >
-              问 AI
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
+              <Icon name="message" size={18} />
+            </IconButton>
+            <IconButton
+              label="生成可视化代码"
               busy={converting}
               disabled={!selected || converting}
-              title="静默把源码转成可视化代码（不跳转）"
               onClick={() => void silentVisualize()}
             >
-              AI 可视化
-            </Button>
+              <Icon name="wand" size={18} />
+            </IconButton>
           </div>
         </div>
         <div className="algo-lab__mode-bar">
           <span className="algo-lab__hint">
             {editorMode === 'source'
-              ? '编辑业务源码；「运行」始终执行可视化代码'
-              : '当前为可视化代码，可直接运行'}
+              ? '编辑源码；运行时执行已保存的可视化代码'
+              : '可视化代码将直接用于运行'}
           </span>
         </div>
         <div style={{ padding: '0 12px 8px' }}>

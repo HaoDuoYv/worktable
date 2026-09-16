@@ -150,7 +150,7 @@ export async function chatComplete(
 
 export async function testAiConnection(settings: AiSettings): Promise<string> {
   return chatComplete(settings, [
-    { role: 'system', content: '你是连接测试助手。' },
+    { role: 'system', content: '你是 Worktable 的 AI 助手。' },
     { role: 'user', content: '请只回复：连接成功' },
   ])
 }

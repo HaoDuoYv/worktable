@@ -104,10 +104,15 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
+  line-height: 0;
   cursor: pointer;
   transition:
     background var(--dur-fast) var(--ease-ui),
     color var(--dur-fast) var(--ease-ui);
+}
+
+.icon-btn .icon {
+  display: block;
 }
 
 .icon-btn:hover:not(:disabled) {

@@ -6,6 +6,7 @@ import './styles/shell.css'
 import './styles/ui.css'
 import './styles/tutorial.css'
 import './styles/algo-lab.css'
+import './styles/select-menu.css'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {

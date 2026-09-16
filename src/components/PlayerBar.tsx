@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { Button } from '@/components/Button'
 import { IconButton } from '@/components/IconButton'
+import { Icon } from '@/components/Icon'
 
 const SPEED_STEPS = [0.25, 0.5, 1, 2, 4] as const
 export type Speed = (typeof SPEED_STEPS)[number]
@@ -88,7 +89,7 @@ export function PlayerBar({
 
       <div className="player-bar__transport">
         <IconButton label="上一步" disabled={disabled || cursor <= 0} onClick={() => onStep(-1)}>
-          ⏮
+          <Icon name="step-back" size={18} />
         </IconButton>
         <IconButton
           label={playing ? '暂停' : '播放'}
@@ -96,14 +97,14 @@ export function PlayerBar({
           onClick={onPlayToggle}
           active={playing}
         >
-          {playing ? '⏸' : '▶'}
+          <Icon name={playing ? 'pause' : 'play'} size={18} />
         </IconButton>
         <IconButton
           label="下一步"
           disabled={disabled || cursor >= total}
           onClick={() => onStep(1)}
         >
-          ⏭
+          <Icon name="step-forward" size={18} />
         </IconButton>
       </div>
 
