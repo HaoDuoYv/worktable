@@ -84,7 +84,7 @@ export function PlayerBar({
   return (
     <div className={`player-bar${disabled ? ' is-disabled' : ''}`}>
       <Button variant="primary" size="sm" busy={building} onClick={onRun} disabled={disabled}>
-        运行
+        {building ? '运行中…' : '运行'}
       </Button>
 
       <div className="player-bar__transport">

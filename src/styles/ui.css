@@ -73,19 +73,34 @@
 
 .btn--busy {
   position: relative;
-  color: transparent;
+  /* Keep label visible under spinner for clarity */
+  color: color-mix(in srgb, var(--text) 55%, transparent);
   pointer-events: none;
 }
 
 .btn--busy::after {
   content: "";
   position: absolute;
+  inset: auto;
+  margin: auto;
   width: 14px;
   height: 14px;
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--text) 28%, transparent);
   border-top-color: var(--text);
   animation: btn-spin 0.7s linear infinite;
+  left: 10px;
+  right: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.btn--busy {
+  padding-left: 30px;
+}
+
+.btn--primary.btn--busy {
+  color: color-mix(in srgb, var(--accent-fg) 70%, transparent);
 }
 
 .btn--primary.btn--busy::after {
@@ -104,8 +119,100 @@
 }
 
 @keyframes btn-spin {
+  from {
+    transform: translateY(-50%) rotate(0deg);
+  }
   to {
-    transform: rotate(360deg);
+    transform: translateY(-50%) rotate(360deg);
+  }
+}
+
+/* Background AI job dock */
+.ai-job-dock {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.ai-job-dock__item {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--elevated);
+  box-shadow: var(--shadow-2);
+}
+
+.ai-job-dock__item.is-error {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+}
+
+.ai-job-dock__item.is-done {
+  border-color: color-mix(in srgb, var(--signal) 40%, var(--line));
+}
+
+.ai-job-dock__icon {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ai-job-dock__spin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--text) 25%, transparent);
+  border-top-color: var(--accent);
+  animation: btn-spin 0.7s linear infinite;
+}
+
+.ai-job-dock__err {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.ai-job-dock__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-job-dock__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-job-dock__detail {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.ai-job-dock__x {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-job-dock__spin {
+    animation-duration: 1.4s;
   }
 }
 

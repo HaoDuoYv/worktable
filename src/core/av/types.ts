@@ -9,7 +9,13 @@ export interface AvChunk {
   lineNumber?: number
 }
 
-export type TracerKind = 'Array1DTracer' | 'Array2DTracer' | 'LogTracer' | 'GraphTracer' | 'unknown'
+export type TracerKind =
+  | 'Array1DTracer'
+  | 'Array2DTracer'
+  | 'LogTracer'
+  | 'GraphTracer'
+  | 'TreeTracer'
+  | 'unknown'
 
 export interface CellState {
   value: unknown

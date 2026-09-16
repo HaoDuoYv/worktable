@@ -209,4 +209,48 @@ const G = [
 })();
 `,
   },
+  {
+    id: 'bst-insert',
+    title: '二叉搜索树插入',
+    description: 'TreeTracer 展示 BST 结构与访问路径。',
+    language: 'javascript',
+    category: '树',
+    tags: ['tree', 'bst'],
+    code: `const { TreeTracer, LogTracer, Tracer, Layout, VerticalLayout } = require('algorithm-visualizer');
+
+const tree = new TreeTracer('BST');
+const log = new LogTracer('日志');
+
+const N = 8;
+const adj = Array.from({ length: N }, () => Array(N).fill(0));
+
+function link(p, c) {
+  adj[p][c] = 1;
+}
+
+// shape: root 4; left 2; right 6; 2->1,3; 6->5,7
+link(4, 2);
+link(4, 6);
+link(2, 1);
+link(2, 3);
+link(6, 5);
+link(6, 7);
+
+(function main() {
+  Layout.setRoot(new VerticalLayout([tree, log]));
+  tree.directed(true);
+  tree.set(adj);
+  Tracer.delay();
+
+  const order = [4, 2, 6, 1, 3, 5, 7];
+  for (const id of order) {
+    tree.visit(id);
+    log.println('访问节点 ' + id);
+    Tracer.delay();
+  }
+  log.println('BST 结构展示完成');
+  Tracer.delay();
+})();
+`,
+  },
 ]

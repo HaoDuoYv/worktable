@@ -30,9 +30,21 @@ async function loadHeader() {
   return cachedHeader
 }
 
-function run(cmd, args, { cwd, timeoutMs = 15000, shell = false } = {}) {
+function compilerEnv(cmd) {
+  const env = { ...process.env }
+  if (isAbsolutePath(cmd)) {
+    const dir = path.dirname(cmd)
+    const key = process.platform === 'win32' && env.Path ? 'Path' : 'PATH'
+    const prev = env[key] || env.PATH || env.Path || ''
+    env[key] = dir + path.delimiter + prev
+    env.PATH = env[key]
+  }
+  return env
+}
+
+function run(cmd, args, { cwd, timeoutMs = 15000, shell = false, env } = {}) {
   return new Promise((resolve) => {
-    const p = spawn(cmd, args, { cwd, shell })
+    const p = spawn(cmd, args, { cwd, shell, env: env || process.env })
     let stdout = ''
     let stderr = ''
     const timer = setTimeout(() => {
@@ -61,7 +73,12 @@ function run(cmd, args, { cwd, timeoutMs = 15000, shell = false } = {}) {
 }
 
 async function probeCompiler(cmd, shell = !isAbsolutePath(cmd)) {
-  const r = await run(cmd, ['--version'], { shell, timeoutMs: 8000 })
+  const env = compilerEnv(cmd)
+  let r = await run(cmd, ['--version'], { shell, timeoutMs: 8000, env })
+  // Windows: absolute path with spaces sometimes needs shell quoting
+  if (r.code !== 0 && isAbsolutePath(cmd) && !shell) {
+    r = await run(cmd, ['--version'], { shell: true, timeoutMs: 8000, env })
+  }
   if (r.code !== 0) return null
   const first = (r.stdout || r.stderr).split(/\r?\n/).find((l) => l.trim()) || cmd
   return {
@@ -140,20 +157,33 @@ async function runCpp(code, compiler, timeoutMs) {
   const header = await loadHeader()
   const dir = await mkdtemp(path.join(tmpdir(), 'worktable-cpp-'))
   const exe = path.join(dir, process.platform === 'win32' ? 'main.exe' : 'main')
+  const env = compilerEnv(compiler.cmd)
   try {
     await writeFile(path.join(dir, 'av.h'), header, 'utf8')
+    // no BOM — some MinGW toolchains choke on UTF-8 BOM
     await writeFile(path.join(dir, 'main.cpp'), code, 'utf8')
 
     const shell = !isAbsolutePath(compiler.cmd)
-    const compile = await run(
+    let compile = await run(
       compiler.cmd,
       ['-std=c++17', '-O0', '-I.', 'main.cpp', '-o', exe],
-      { cwd: dir, timeoutMs, shell },
+      { cwd: dir, timeoutMs, shell, env },
     )
-    if (compile.code !== 0) {
-      return { ok: false, error: compile.stderr || '编译失败' }
+    if (compile.code !== 0 && !shell && isAbsolutePath(compiler.cmd)) {
+      compile = await run(
+        compiler.cmd,
+        ['-std=c++17', '-O0', '-I.', 'main.cpp', '-o', exe],
+        { cwd: dir, timeoutMs, shell: true, env },
+      )
     }
-    const exec = await run(exe, [], { cwd: dir, timeoutMs, shell: false })
+    if (compile.code !== 0) {
+      const detail = (compile.stderr || compile.stdout || '').trim()
+      return {
+        ok: false,
+        error: detail || `编译失败（exit=${compile.code}）。请确认编译器目录已含 as/ld 等工具，或在设置中改用完整工具链路径。`,
+      }
+    }
+    const exec = await run(exe, [], { cwd: dir, timeoutMs, shell: false, env })
     if (exec.code !== 0 && !exec.stdout.includes('AVCMD')) {
       return { ok: false, error: exec.stderr || `运行失败 exit=${exec.code}` }
     }
@@ -190,10 +220,13 @@ export function startCppServer(options = {}) {
       return
     }
 
-    if (req.method === 'GET' && req.url === '/health') {
+    if (req.method === 'GET' && (req.url === '/health' || req.url.startsWith('/health?'))) {
+      const u = new URL(req.url || '/health', 'http://127.0.0.1')
+      const preferred = u.searchParams.get('preferred') || defaultPreferred
+      const compilerPath = u.searchParams.get('compilerPath') || defaultCompilerPath
       const compilers = await findCompilers({
-        preferred: defaultPreferred,
-        compilerPath: defaultCompilerPath,
+        preferred,
+        compilerPath,
       })
       const header = await loadHeader()
       json(res, 200, {
@@ -203,6 +236,10 @@ export function startCppServer(options = {}) {
         platform: process.platform,
         headerPath: AV_H_PATH,
         headerBytes: Buffer.byteLength(header || '', 'utf8'),
+        probed: {
+          preferred,
+          compilerPath: compilerPath || null,
+        },
       })
       return
     }

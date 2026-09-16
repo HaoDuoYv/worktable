@@ -168,7 +168,7 @@ export function buildAlgoSystemPrompt(): string {
     '你是算法可视化助教。用户会给出算法代码（algorithm-visualizer tracers 协议）。',
     '必须严格遵循项目规范 docs/VIS_SPEC.md：',
     '- 至少创建 1 个 Tracer',
-    '- 必须 Layout.setRoot（Python 可用 set_root）',
+    '- 必须 Layout.setRoot（Python 可用 set_root；C++ 必须 Layout::setRoot，禁止 Layout.setRoot）',
     '- 必须至少 1 次 Tracer.delay()',
     '- JS 必须 require("algorithm-visualizer")，禁止 ESM import',
     '- Python 禁止 import algorithm_visualizer（运行时已注入）',

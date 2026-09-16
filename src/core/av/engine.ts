@@ -67,11 +67,61 @@ function circleLayout(nodes: GraphNodeState[]) {
   })
 }
 
+/** Top-down hierarchical layout for trees (BFS levels). */
+function treeLayout(nodes: GraphNodeState[], edges: GraphEdgeState[]) {
+  if (nodes.length === 0) return
+  const children = new Map<number, number[]>()
+  const hasParent = new Set<number>()
+  for (const e of edges) {
+    if (!children.has(e.source)) children.set(e.source, [])
+    children.get(e.source)!.push(e.target)
+    hasParent.add(e.target)
+  }
+  const roots = nodes.filter((n) => !hasParent.has(n.id)).map((n) => n.id)
+  const rootIds = roots.length > 0 ? roots : [nodes[0]!.id]
+  const level = new Map<number, number>()
+  const order: number[] = []
+  const queue = [...rootIds]
+  for (const r of rootIds) level.set(r, 0)
+  while (queue.length) {
+    const id = queue.shift()!
+    order.push(id)
+    for (const c of children.get(id) ?? []) {
+      if (!level.has(c)) {
+        level.set(c, (level.get(id) ?? 0) + 1)
+        queue.push(c)
+      }
+    }
+  }
+  for (const n of nodes) {
+    if (!level.has(n.id)) level.set(n.id, 0)
+  }
+  const byLevel = new Map<number, number[]>()
+  for (const n of nodes) {
+    const lv = level.get(n.id) ?? 0
+    if (!byLevel.has(lv)) byLevel.set(lv, [])
+    byLevel.get(lv)!.push(n.id)
+  }
+  const maxLevel = Math.max(...byLevel.keys())
+  const width = 220
+  const height = 40 + maxLevel * 70
+  for (const [lv, ids] of byLevel) {
+    ids.forEach((id, i) => {
+      const node = nodes.find((n) => n.id === id)
+      if (!node) return
+      const span = ids.length
+      node.x = ((i + 1) / (span + 1) - 0.5) * width
+      node.y = (lv / Math.max(maxLevel, 1) - 0.5) * height
+    })
+  }
+}
+
 const KNOWN: Record<string, TracerKind> = {
   Array1DTracer: 'Array1DTracer',
   Array2DTracer: 'Array2DTracer',
   LogTracer: 'LogTracer',
   GraphTracer: 'GraphTracer',
+  TreeTracer: 'TreeTracer',
   ChartTracer: 'unknown',
   MarkdownTracer: 'unknown',
   ScatterTracer: 'unknown',
@@ -151,7 +201,7 @@ export class AvEngine {
     const model = this.objects.get(key)
     if (!model) return
 
-    if (model.kind === 'GraphTracer') {
+    if (model.kind === 'GraphTracer' || model.kind === 'TreeTracer') {
       this.applyGraph(model, method, args)
       return
     }
@@ -250,6 +300,10 @@ export class AvEngine {
   }
 
   private applyGraph(model: TracerModel, method: string, args: unknown[]): void {
+    const relayout = () => {
+      if (model.kind === 'TreeTracer') treeLayout(model.nodes, model.edges)
+      else circleLayout(model.nodes)
+    }
     switch (method) {
       case 'directed':
         model.isDirected = Boolean(args[0] ?? true)
@@ -281,7 +335,7 @@ export class AvEngine {
             }
           }
         }
-        circleLayout(model.nodes)
+        relayout()
         break
       }
       case 'addNode': {
@@ -295,7 +349,7 @@ export class AvEngine {
             visitedCount: 0,
             selectedCount: 0,
           })
-          circleLayout(model.nodes)
+          relayout()
         }
         break
       }
@@ -309,6 +363,7 @@ export class AvEngine {
             visitedCount: 0,
             selectedCount: 0,
           })
+          relayout()
         }
         break
       }

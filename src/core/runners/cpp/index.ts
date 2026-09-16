@@ -86,14 +86,23 @@ export function saveCppBaseUrl(url: string): void {
 
 export async function detectCppServer(
   baseUrl = loadCppSettings().baseUrl,
+  opts?: { preferredCompiler?: CppPreferred; compilerPath?: string },
 ): Promise<{
   ok: boolean
   compilers: string[]
   details: CppCompilerInfo[]
   detail?: string
 }> {
+  const settings = loadCppSettings()
+  const preferred = opts?.preferredCompiler ?? settings.preferredCompiler
+  const compilerPath = (opts?.compilerPath ?? settings.compilerPath).trim()
+  const params = new URLSearchParams()
+  if (preferred && preferred !== 'auto') params.set('preferred', preferred)
+  if (compilerPath) params.set('compilerPath', compilerPath)
+  const qs = params.toString()
+  const url = `${baseUrl.replace(/\/+$/, '')}/health${qs ? `?${qs}` : ''}`
   try {
-    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/health`, {
+    const res = await fetch(url, {
       method: 'GET',
     })
     if (!res.ok) {
@@ -113,7 +122,12 @@ export async function detectCppServer(
       ok: Boolean(data.ok) && compilers.length > 0,
       compilers,
       details,
-      detail: data.ok && compilers.length > 0 ? undefined : '服务未报告可用编译器',
+      detail:
+        data.ok && compilers.length > 0
+          ? undefined
+          : compilerPath
+            ? `未检测到可用编译器。请确认路径有效：${compilerPath}`
+            : '服务未报告可用编译器',
     }
   } catch {
     return { ok: false, compilers: [], details: [], detail: '无法连接 C++ 服务' }

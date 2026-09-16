@@ -4,6 +4,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuth } from '@/modules/auth/AuthContext'
 import { Icon, WorktableMark, type IconName } from '@/components/Icon'
 import { IconButton } from '@/components/IconButton'
+import { AiJobDock } from '@/modules/ai/AiJobDock'
 
 const NAV_ITEMS: {
   to: string
@@ -97,6 +98,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <main id="main-content" className={`app-shell__main${flush ? ' is-flush' : ''}`}>
         {children ?? <Outlet />}
       </main>
+      <AiJobDock />
     </div>
   )
 }

@@ -24,13 +24,11 @@ import {
   bulkPutAlgorithms,
 } from '@/core/storage/indexedDb'
 import { InlineAiPanel } from '@/modules/ai/InlineAiPanel'
-import { extractCodeBlock, validateVizCode, formatValidateError } from './vizValidate'
+import { startVizConvertJob } from '@/modules/ai/aiBackground'
 import {
   buildAlgoSystemPrompt,
-  chatComplete,
   formatAlgorithmContext,
   isAiConfigured,
-  loadAiSettings,
 } from '@/modules/ai/aiClient'
 
 type FilterMode = 'all' | 'favorite' | 'mine'
@@ -193,91 +191,37 @@ export function AlgorithmsLabPage() {
     [code, editorMode, selected],
   )
 
-  /** Convert source to visualization code without opening the chat panel. */
-  const silentVisualize = useCallback(async () => {
+  /** Convert source to visualization code in a background job (survives navigation). */
+  const silentVisualize = useCallback(() => {
     if (!selected) return
     if (!isAiConfigured()) {
       setError('请先在设置中配置 AI 接口地址与密钥。')
       return
     }
-    const src =
-      editorMode === 'source' ? code : (selected.sourceCode ?? code)
+    const src = editorMode === 'source' ? code : (selected.sourceCode ?? code)
     if (!src.trim()) {
       setError('源码为空')
       return
     }
-    setConverting(true)
     setError(null)
-    try {
-      const langName = selected.language
-      const prompt = [
-        buildAlgoSystemPrompt(),
-        '',
-        `用户源码如下，请转换为带 visualization tracers 的可执行完整代码。`,
-        `语言：${langName}`,
-        langName === 'javascript'
-          ? '必须使用 require("algorithm-visualizer")，Array1DTracer/LogTracer，Tracer.delay()，Layout.setRoot。只输出一个 ```javascript 代码块，不要解释。'
-          : langName === 'python'
-            ? '直接使用注入的 Array1DTracer/LogTracer/Tracer/Layout，不要 import algorithm_visualizer。只输出一个 ```python 代码块。'
-            : '使用 #include "av.h" 与 av:: 命名空间。只输出一个 ```cpp 代码块。',
-        '',
-        '【源码】',
-        langName === 'python' ? '```python' : langName === 'cpp' ? '```cpp' : '```javascript',
-        src,
-        '```',
-      ].join('\n')
-
-      const reply = await chatComplete(loadAiSettings(), [
-        { role: 'system', content: buildAlgoSystemPrompt() },
-        { role: 'user', content: prompt },
-      ])
-      const viz = extractCodeBlock(reply, langName)
-      if (!viz) {
-        // 失败不覆盖
-        setError('AI 未返回可用代码块，已保留原可视化代码。')
-        return
-      }
-
-      // 静态校验 — docs/VIS_SPEC.md §7；失败不写入 vizCode
-      const report = validateVizCode(viz, langName)
-      if (!report.ok) {
-        setError(formatValidateError(report))
-        return
-      }
-
-      const now = Date.now()
-      const next: Algorithm = {
-        ...selected,
-        sourceCode: src,
-        vizCode: viz,
-        editorMode: 'viz',
-        files: [
-          {
-            name:
-              selected.files[0]?.name ??
-              `main.${langName === 'python' ? 'py' : langName === 'cpp' ? 'cpp' : 'js'}`,
-            content: viz,
-          },
-        ],
-        updatedAt: now,
-      }
-      await saveAlgorithm(next)
-      const all = await listAlgorithms()
-      setItems(all)
-      setEditorMode('viz')
-      setCode(viz)
-      setDirty(false)
-      const warn =
-        report.warnings.length > 0 ? `（警告：${report.warnings.join('；')}）` : ''
-      showToast(`已生成可视化代码并通过校验${warn}`)
-    } catch (e) {
-      setError(
-        `AI 转换失败，已保留原可视化代码。\n${e instanceof Error ? e.message : String(e)}`,
-      )
-    } finally {
-      setConverting(false)
-    }
-  }, [code, editorMode, selected, showToast])
+    setConverting(true)
+    const algoId = selected.id
+    startVizConvertJob({
+      algorithm: selected,
+      sourceCode: src,
+      onApplied: (next) => {
+        void listAlgorithms().then((all) => setItems(all))
+        if (selectedId !== algoId) return
+        setEditorMode('viz')
+        setCode(next.vizCode ?? '')
+        setDirty(false)
+        showToast('已生成可视化代码并通过校验')
+        setConverting(false)
+      },
+    })
+    // Job dock shows progress; local chip only flashes briefly
+    window.setTimeout(() => setConverting(false), 600)
+  }, [code, editorMode, selected, selectedId, showToast])
 
 
   const categories = useMemo(() => {

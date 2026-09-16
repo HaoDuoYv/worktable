@@ -9,7 +9,18 @@ type RunPayload = { code: string }
 
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   try {
-    const AlgorithmVisualizer = await import('algorithm-visualizer')
+    const imported = await import('algorithm-visualizer')
+    // Official package has no TreeTracer — alias GraphTracer so constructor.name drives TreeTracer.
+    const AlgorithmVisualizer: Record<string, unknown> = { ...(imported as object) }
+    if (typeof AlgorithmVisualizer.TreeTracer !== 'function') {
+      const GraphTracer = AlgorithmVisualizer.GraphTracer as new (
+        title?: string,
+      ) => object
+      class TreeTracer extends GraphTracer {}
+      Object.defineProperty(TreeTracer, 'name', { value: 'TreeTracer' })
+      AlgorithmVisualizer.TreeTracer = TreeTracer
+    }
+
     const raw = event.data.code
     // Instrument Tracer.delay() with 0-based line numbers (official worker behavior uses i, UI adds 1)
     const lines = raw.split('\n').map((line, i) =>

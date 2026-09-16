@@ -187,6 +187,10 @@ class GraphTracer(Tracer):
         self._cmd("deselect", args)
 
 
+class TreeTracer(GraphTracer):
+    """Binary tree / hierarchical tree — same protocol as Graph with tree layout."""
+
+
 class _Layout(_Commander):
     def __init__(self, children: Optional[list] = None) -> None:
         _Commander.__init__(self)

@@ -140,7 +140,7 @@ export function TracerPanel({ state }: { state: TracerViewState }) {
   }
   if (state.kind === 'Array2DTracer') return <Array2DView state={state} />
   if (state.kind === 'LogTracer') return <LogView state={state} />
-  if (state.kind === 'GraphTracer') return <GraphView state={state} />
+  if (state.kind === 'GraphTracer' || state.kind === 'TreeTracer') return <GraphView state={state} />
   return (
     <div className="viz-panel">
       <div className="viz-panel__title">{state.title || state.kind}</div>

@@ -5,7 +5,6 @@ import { EmptyState } from '@/components/Page'
 import {
   buildAlgoSystemPrompt,
   buildTutorialSystemPrompt,
-  chatComplete,
   createChatId,
   deleteChatSession,
   formatAlgorithmContext,
@@ -14,9 +13,9 @@ import {
   loadAiSettings,
   loadChatSessions,
   upsertChatSession,
-  type ChatMessage,
   type ChatSession,
 } from './aiClient'
+import { startChatJob } from './aiBackground'
 import { getAlgorithm, getNote, getTutorial, saveTutorial } from '@/core/storage/indexedDb'
 import { noteId } from '@/modules/tutorials/types'
 import { primaryCode } from '@/modules/algorithms/types'
@@ -161,7 +160,7 @@ export function AiPage() {
   }, [])
 
   const sendSession = useCallback(
-    async (sessionId: string, userText?: string) => {
+    (sessionId: string, userText?: string) => {
       const settings = loadAiSettings()
       if (!isAiConfigured(settings)) {
         setError('请先在设置中配置 AI 接口地址与密钥。')
@@ -171,47 +170,33 @@ export function AiPage() {
       if (!current) return
 
       let messages = current.messages
+      let title = current.title
       if (userText != null) {
         messages = [
           ...messages,
           { role: 'user', content: userText, createdAt: Date.now() },
         ]
+        if (current.messages.length <= 1) title = userText.slice(0, 24) || current.title
         const next: ChatSession = {
           ...current,
           messages,
+          title,
           updatedAt: Date.now(),
-          title:
-            current.messages.length <= 1
-              ? userText.slice(0, 24) || current.title
-              : current.title,
         }
         persist(next)
       }
 
-      setBusy(true)
       setError(null)
-      try {
-        const reply = await chatComplete(
-          settings,
-          messages.map((m) => ({ role: m.role, content: m.content })),
-        )
-        const latest = loadChatSessions().find((s) => s.id === sessionId)
-        if (!latest) return
-        const assistant: ChatMessage = {
-          role: 'assistant',
-          content: reply,
-          createdAt: Date.now(),
-        }
-        persist({
-          ...latest,
-          messages: [...latest.messages, assistant],
-          updatedAt: Date.now(),
-        })
-      } catch (e) {
-        setError(e instanceof Error ? e.message : '请求失败')
-      } finally {
-        setBusy(false)
-      }
+      setBusy(true)
+      startChatJob({
+        sessionId,
+        sessionTitle: title,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        onSettled: () => {
+          setSessions(loadChatSessions())
+          setBusy(false)
+        },
+      })
     },
     [persist],
   )
@@ -220,7 +205,7 @@ export function AiPage() {
     const text = input.trim()
     if (!text || !active || busy) return
     setInput('')
-    void sendSession(active.id, text)
+    sendSession(active.id, text)
   }, [active, busy, input, sendSession])
 
   const onCreate = useCallback(() => {

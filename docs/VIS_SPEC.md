@@ -48,7 +48,7 @@
 
 ```js
 const {
-  Array1DTracer, Array2DTracer, LogTracer, GraphTracer,
+  Array1DTracer, Array2DTracer, LogTracer, GraphTracer, TreeTracer,
   Tracer, Layout, VerticalLayout, HorizontalLayout,
 } = require('algorithm-visualizer')
 ```
@@ -132,7 +132,7 @@ for (let i = 0; i < A.length; i++) {
 **不要** `import algorithm_visualizer`。  
 工作台在执行前已注入：
 
-`Array1DTracer, Array2DTracer, LogTracer, GraphTracer, Tracer, Layout, VerticalLayout, HorizontalLayout, visualize`
+`Array1DTracer, Array2DTracer, LogTracer, GraphTracer, TreeTracer, Tracer, Layout, VerticalLayout, HorizontalLayout, visualize`
 
 ### 4.2 必选
 
@@ -184,7 +184,7 @@ using namespace av;
 ### 5.2 必选
 
 1. 至少 1 个 `Array1DTracer` / `LogTracer` / …  
-2. `Layout.setRoot(...)`  
+2. `Layout::setRoot(...)`（C++ 用 `::`，不可写 `Layout.setRoot`）  
 3. 至少 1 次 `Tracer::delay(...)`（参数为 0-based 行号，可选）
 
 ### 5.3 示例
@@ -200,7 +200,7 @@ int main() {
   std::vector<int> A = {3, 1, 2};
 
   VerticalLayout layout({&array1d, &log});
-  Layout.setRoot(layout);
+  Layout::setRoot(layout);
   array1d.set(A);
   Tracer::delay(12);
 

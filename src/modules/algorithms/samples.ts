@@ -18,7 +18,7 @@ export function makePythonBubbleSort(): Algorithm {
       {
         name: 'bubble_sort.py',
         content: `# Worktable Python runtime injects tracers automatically
-# Available: Array1DTracer, LogTracer, Tracer, Layout, VerticalLayout
+# Available: Array1DTracer, LogTracer, GraphTracer, TreeTracer, Tracer, Layout, VerticalLayout
 
 array1d = Array1DTracer("数组")
 log = LogTracer("日志")
@@ -79,7 +79,7 @@ int main() {
   std::vector<int> A = {5, 2, 9, 1, 5, 6};
 
   VerticalLayout layout({&array1d, &log});
-  Layout.setRoot(layout);
+  Layout::setRoot(layout);
   array1d.set(A);
   Tracer::delay(14);
 

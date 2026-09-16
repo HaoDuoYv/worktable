@@ -82,6 +82,45 @@ public:
   void depatch(int x) { emit(k, "depatch", "[" + std::to_string(x) + "]"); }
 };
 
+class GraphTracer : public Tracer {
+protected:
+  GraphTracer(const std::string& kind, const std::string& title) : Tracer(kind, title) {}
+
+public:
+  GraphTracer(const std::string& title = "Graph") : Tracer("GraphTracer", title) {}
+  void directed(bool d = true) {
+    emit(k, "directed", d ? "[true]" : "[false]");
+  }
+  void set(const std::vector<std::vector<int>>& g) {
+    std::ostringstream o;
+    o << "[";
+    for (size_t i = 0; i < g.size(); ++i) {
+      if (i) o << ",";
+      o << "[";
+      for (size_t j = 0; j < g[i].size(); ++j) {
+        if (j) o << ",";
+        o << g[i][j];
+      }
+      o << "]";
+    }
+    o << "]";
+    emit(k, "set", "[" + o.str() + "]");
+  }
+  void visit(int target, int source = -1) {
+    if (source < 0) emit(k, "visit", "[" + std::to_string(target) + "]");
+    else emit(k, "visit", "[" + std::to_string(target) + "," + std::to_string(source) + "]");
+  }
+  void leave(int target, int source = -1) {
+    if (source < 0) emit(k, "leave", "[" + std::to_string(target) + "]");
+    else emit(k, "leave", "[" + std::to_string(target) + "," + std::to_string(source) + "]");
+  }
+};
+
+class TreeTracer : public GraphTracer {
+public:
+  TreeTracer(const std::string& title = "Tree") : GraphTracer("TreeTracer", title) {}
+};
+
 class VerticalLayout {
 public:
   std::string k;
