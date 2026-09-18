@@ -73,6 +73,78 @@ export function LogView({ state }: { state: TracerViewState }) {
   )
 }
 
+export function StackView({ state }: { state: TracerViewState }) {
+  const row = state.array?.[0] ?? []
+  const cells = [...row].reverse() // top of stack on top
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{state.title}</div>
+      <div className="viz-stack">
+        <div className="viz-stack__cap">top</div>
+        {cells.map((cell, i) => (
+          <div key={i} className={cellClass(cell)}>
+            <span className="viz-array1d__val">{fmt(cell.value)}</span>
+          </div>
+        ))}
+        {cells.length === 0 ? <span className="viz-empty">空栈</span> : null}
+        <div className="viz-stack__cap">bottom</div>
+      </div>
+    </div>
+  )
+}
+
+export function QueueView({ state }: { state: TracerViewState }) {
+  const row = state.array?.[0] ?? []
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{state.title}</div>
+      <div className="viz-queue">
+        <div className="viz-queue__cap">front</div>
+        <div className="viz-queue__row">
+          {row.map((cell, i) => (
+            <div key={i} className={cellClass(cell)}>
+              <span className="viz-array1d__val">{fmt(cell.value)}</span>
+            </div>
+          ))}
+          {row.length === 0 ? <span className="viz-empty">空队列</span> : null}
+        </div>
+        <div className="viz-queue__cap">back</div>
+      </div>
+    </div>
+  )
+}
+
+export function LinkedListView({ state }: { state: TracerViewState }) {
+  const row = state.array?.[0] ?? []
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{state.title}</div>
+      <div className="viz-list">
+        {row.length === 0 ? <span className="viz-empty">空链表</span> : null}
+        {row.map((cell, i) => (
+          <div key={i} className="viz-list__node-wrap">
+            <div className={`${cellClass(cell)} viz-list__node`}>
+              <span className="viz-list__val">{fmt(cell.value)}</span>
+              <span className="viz-list__ptr" aria-hidden="true">
+                ·
+              </span>
+            </div>
+            {i < row.length - 1 ? (
+              <span className="viz-list__arrow" aria-hidden="true">
+                →
+              </span>
+            ) : (
+              <span className="viz-list__null" aria-hidden="true">
+                ∅
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function GraphView({ state }: { state: TracerViewState }) {
   const nodes = state.nodes ?? []
   const edges = state.edges ?? []
@@ -114,17 +186,19 @@ export function GraphView({ state }: { state: TracerViewState }) {
         {nodes.map((n) => {
           const p = nodePos.get(n.id)
           if (!p) return null
+          const colorCls = n.color === 'red' ? ' is-red' : n.color === 'black' ? ' is-black' : ''
           const cls =
             n.selectedCount > 0
-              ? 'viz-node is-selected'
+              ? `viz-node is-selected${colorCls}`
               : n.visitedCount > 0
-                ? 'viz-node is-visited'
-                : 'viz-node'
+                ? `viz-node is-visited${colorCls}`
+                : `viz-node${colorCls}`
+          const label = n.label ?? (n.weight != null ? String(n.weight) : String(n.id))
           return (
             <g key={n.id} transform={`translate(${p.x},${p.y})`}>
               <circle r={14} className={cls} />
               <text textAnchor="middle" dominantBaseline="central" className="viz-node__label">
-                {n.id}
+                {label}
               </text>
             </g>
           )
@@ -134,13 +208,121 @@ export function GraphView({ state }: { state: TracerViewState }) {
   )
 }
 
+export function CircularQueueView({ state }: { state: TracerViewState }) {
+  const cells = state.array?.[0] ?? []
+  const n = Math.max(cells.length, state.capacity ?? 0)
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">
+        {state.title}
+        <span className="viz-panel__meta">
+          head={state.head ?? 0} tail={state.tail ?? 0} cap={n}
+        </span>
+      </div>
+      <div className="viz-ring">
+        {cells.map((cell, i) => {
+          const isHead = i === (state.head ?? 0) % Math.max(n, 1)
+          const isTail = i === (state.tail ?? 0) % Math.max(n, 1)
+          return (
+            <div
+              key={i}
+              className={`${cellClass(cell)} viz-ring__slot${isHead ? ' is-head' : ''}${isTail ? ' is-tail' : ''}`}
+            >
+              <span className="viz-array1d__idx">{i}</span>
+              <span className="viz-array1d__val">{cell.value == null ? '·' : fmt(cell.value)}</span>
+              <span className="viz-ring__tag">
+                {isHead && isTail ? 'H/T' : isHead ? 'H' : isTail ? 'T' : ''}
+              </span>
+            </div>
+          )
+        })}
+        {cells.length === 0 ? <span className="viz-empty">未初始化环形队列</span> : null}
+      </div>
+    </div>
+  )
+}
+
+export function DequeView({ state }: { state: TracerViewState }) {
+  const row = state.array?.[0] ?? []
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{state.title}</div>
+      <div className="viz-deque">
+        <div className="viz-queue__cap">front</div>
+        <div className="viz-queue__row">
+          {row.map((cell, i) => (
+            <div key={i} className={cellClass(cell)}>
+              <span className="viz-array1d__val">{fmt(cell.value)}</span>
+            </div>
+          ))}
+          {row.length === 0 ? <span className="viz-empty">空双端队列</span> : null}
+        </div>
+        <div className="viz-queue__cap">back</div>
+      </div>
+    </div>
+  )
+}
+
+export function StaticLinkedListView({ state }: { state: TracerViewState }) {
+  const data = state.array?.[0] ?? []
+  const next = state.array?.[1] ?? []
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{state.title}</div>
+      <div className="viz-scroll">
+        <table className="viz-array2d">
+          <thead>
+            <tr>
+              <th />
+              {data.map((_, j) => (
+                <th key={j}>{j}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>data</th>
+              {data.map((cell, j) => (
+                <td key={j} className={cellClass(cell)}>
+                  {cell.value == null ? '·' : fmt(cell.value)}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th>next</th>
+              {next.map((cell, j) => (
+                <td key={j} className={cellClass(cell)}>
+                  {cell.value == null ? '·' : fmt(cell.value)}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export function TracerPanel({ state }: { state: TracerViewState }) {
-  if (state.kind === 'Array1DTracer' || state.isArray1D) {
+  if (state.kind === 'CircularQueueTracer') return <CircularQueueView state={state} />
+  if (state.kind === 'DequeTracer') return <DequeView state={state} />
+  if (state.kind === 'StaticLinkedListTracer') return <StaticLinkedListView state={state} />
+  if (state.kind === 'Array1DTracer' || (state.isArray1D && !state.isStaticList)) {
+    if (state.kind === 'StackTracer') return <StackView state={state} />
+    if (state.kind === 'QueueTracer') return <QueueView state={state} />
+    if (state.kind === 'LinkedListTracer') return <LinkedListView state={state} />
     return <Array1DView state={state} />
   }
   if (state.kind === 'Array2DTracer') return <Array2DView state={state} />
   if (state.kind === 'LogTracer') return <LogView state={state} />
-  if (state.kind === 'GraphTracer' || state.kind === 'TreeTracer') return <GraphView state={state} />
+  if (
+    state.kind === 'GraphTracer' ||
+    state.kind === 'TreeTracer' ||
+    state.kind === 'RedBlackTreeTracer' ||
+    state.kind === 'BPlusTreeTracer'
+  ) {
+    return <GraphView state={state} />
+  }
   return (
     <div className="viz-panel">
       <div className="viz-panel__title">{state.title || state.kind}</div>

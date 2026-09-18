@@ -121,6 +121,65 @@ public:
   TreeTracer(const std::string& title = "Tree") : GraphTracer("TreeTracer", title) {}
 };
 
+class StackTracer : public Tracer {
+public:
+  StackTracer(const std::string& title = "Stack") : Tracer("StackTracer", title) {}
+  void set(const std::vector<int>& a) {
+    std::ostringstream o;
+    o << "[[";
+    for (size_t i = 0; i < a.size(); ++i) {
+      if (i) o << ",";
+      o << a[i];
+    }
+    o << "]]";
+    emit(k, "set", o.str());
+  }
+  void push(int v) { emit(k, "push", "[" + std::to_string(v) + "]"); }
+  void pop() { emit(k, "pop", "[]"); }
+  void select(int i) { emit(k, "select", "[" + std::to_string(i) + "]"); }
+  void deselect(int i) { emit(k, "deselect", "[" + std::to_string(i) + "]"); }
+};
+
+class QueueTracer : public Tracer {
+public:
+  QueueTracer(const std::string& title = "Queue") : Tracer("QueueTracer", title) {}
+  void set(const std::vector<int>& a) {
+    std::ostringstream o;
+    o << "[[";
+    for (size_t i = 0; i < a.size(); ++i) {
+      if (i) o << ",";
+      o << a[i];
+    }
+    o << "]]";
+    emit(k, "set", o.str());
+  }
+  void enqueue(int v) { emit(k, "enqueue", "[" + std::to_string(v) + "]"); }
+  void dequeue() { emit(k, "dequeue", "[]"); }
+  void select(int i) { emit(k, "select", "[" + std::to_string(i) + "]"); }
+  void deselect(int i) { emit(k, "deselect", "[" + std::to_string(i) + "]"); }
+};
+
+class LinkedListTracer : public Tracer {
+public:
+  LinkedListTracer(const std::string& title = "List") : Tracer("LinkedListTracer", title) {}
+  void set(const std::vector<int>& a) {
+    std::ostringstream o;
+    o << "[[";
+    for (size_t i = 0; i < a.size(); ++i) {
+      if (i) o << ",";
+      o << a[i];
+    }
+    o << "]]";
+    emit(k, "set", o.str());
+  }
+  void push(int v) { emit(k, "push", "[" + std::to_string(v) + "]"); }
+  void unshift(int v) { emit(k, "unshift", "[" + std::to_string(v) + "]"); }
+  void pop() { emit(k, "pop", "[]"); }
+  void shift() { emit(k, "shift", "[]"); }
+  void select(int i) { emit(k, "select", "[" + std::to_string(i) + "]"); }
+  void deselect(int i) { emit(k, "deselect", "[" + std::to_string(i) + "]"); }
+};
+
 class VerticalLayout {
 public:
   std::string k;

@@ -18,19 +18,25 @@ export interface VizValidateResult {
   warnings: string[]
 }
 
-const TRACER_JS_RE =
-  /\bnew\s+(Array1DTracer|Array2DTracer|LogTracer|GraphTracer|ChartTracer|ScatterTracer)\s*\(/
+const TRACER_NAMES =
+  'Array1DTracer|Array2DTracer|LogTracer|GraphTracer|TreeTracer|StackTracer|QueueTracer|LinkedListTracer|CircularQueueTracer|DequeTracer|RedBlackTreeTracer|BPlusTreeTracer|StaticLinkedListTracer|ChartTracer|ScatterTracer'
 
-const TRACER_PY_RE =
-  /\b(Array1DTracer|Array2DTracer|LogTracer|GraphTracer)\s*\(/
+const TRACER_JS_RE = new RegExp(`\\bnew\\s+(${TRACER_NAMES})\\s*\\(`)
 
-const TRACER_CPP_RE =
-  /\b(Array1DTracer|Array2DTracer|LogTracer|GraphTracer)\s+\w+\s*\(/
+const TRACER_PY_RE = new RegExp(
+  `\\b(${TRACER_NAMES})\\s*\\(`,
+)
+
+const TRACER_CPP_RE = new RegExp(
+  `\\b(${TRACER_NAMES})\\s+\\w+\\s*\\(`,
+)
 
 const DELAY_JS_PY_RE = /\bTracer\s*\.\s*delay\s*\(/
 const DELAY_CPP_RE = /\bTracer\s*::\s*delay\s*\(/
 
-const SET_ROOT_RE = /\b(?:Layout\s*\.\s*setRoot|Layout\s*\.\s*set_root|setRoot)\s*\(/
+const SET_ROOT_RE =
+  /\b(?:Layout\s*(?:\.|::)\s*set_?[Rr]oot|setRoot)\s*\(/
+const SET_ROOT_CPP_BAD_RE = /\bLayout\s*\.\s*setRoot\s*\(/
 
 const JS_REQUIRE_AV_RE = /require\s*\(\s*['"]algorithm-visualizer['"]\s*\)/
 const JS_REQUIRE_ANY_G = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g
@@ -248,8 +254,17 @@ export function validateVizCode(
   }
 
   checks.push(
-    check('has-set-root', SET_ROOT_RE.test(body), '缺少 Layout.setRoot / set_root（has-set-root）'),
+    check('has-set-root', SET_ROOT_RE.test(body), '缺少 Layout.setRoot / set_root / Layout::setRoot（has-set-root）'),
   )
+  if (language === 'cpp') {
+    checks.push(
+      check(
+        'cpp-setroot-syntax',
+        !SET_ROOT_CPP_BAD_RE.test(body) || /\bLayout\s*::\s*setRoot\s*\(/.test(body),
+        'C++ 请使用 Layout::setRoot，不要写 Layout.setRoot（cpp-setroot-syntax）',
+      ),
+    )
+  }
 
   const errors = checks.filter((c) => !c.ok && c.level === 'reject').map((c) => c.message)
   const warnings = checks.filter((c) => !c.ok && c.level === 'warn').map((c) => c.message)

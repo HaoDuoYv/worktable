@@ -15,6 +15,14 @@ export type TracerKind =
   | 'LogTracer'
   | 'GraphTracer'
   | 'TreeTracer'
+  | 'StackTracer'
+  | 'QueueTracer'
+  | 'LinkedListTracer'
+  | 'CircularQueueTracer'
+  | 'DequeTracer'
+  | 'RedBlackTreeTracer'
+  | 'BPlusTreeTracer'
+  | 'StaticLinkedListTracer'
   | 'unknown'
 
 export interface CellState {
@@ -30,6 +38,11 @@ export interface GraphNodeState {
   y: number
   visitedCount: number
   selectedCount: number
+  color?: 'red' | 'black' | null
+  label?: string | null
+  parent?: number | null
+  left?: number | null
+  right?: number | null
 }
 
 export interface GraphEdgeState {
@@ -51,6 +64,12 @@ export interface TracerViewState {
   nodes?: GraphNodeState[]
   edges?: GraphEdgeState[]
   isDirected?: boolean
+  /** circular queue */
+  capacity?: number
+  head?: number
+  tail?: number
+  /** static linked list: second row is next-index */
+  isStaticList?: boolean
 }
 
 export function buildChunks(commands: AvCommand[]): AvChunk[] {

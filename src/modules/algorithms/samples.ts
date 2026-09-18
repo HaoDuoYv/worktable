@@ -3,22 +3,8 @@ import { createAlgorithmId } from './types'
 
 export function makePythonBubbleSort(): Algorithm {
   const now = Date.now()
-  return {
-    id: createAlgorithmId(),
-    title: '冒泡排序（Python）',
-    description: 'Python + tracers 可视化冒泡排序。',
-    language: 'python',
-    category: '排序',
-    tags: ['python', 'sort'],
-    favorite: false,
-    createdAt: now,
-    updatedAt: now,
-    source: 'user',
-    files: [
-      {
-        name: 'bubble_sort.py',
-        content: `# Worktable Python runtime injects tracers automatically
-# Available: Array1DTracer, LogTracer, GraphTracer, TreeTracer, Tracer, Layout, VerticalLayout
+  const code = `# Worktable Python runtime injects tracers automatically
+# Available: Array1DTracer, LogTracer, GraphTracer, TreeTracer, StackTracer, QueueTracer, LinkedListTracer, Tracer, Layout, VerticalLayout
 
 array1d = Array1DTracer("数组")
 log = LogTracer("日志")
@@ -47,29 +33,28 @@ def main():
     Tracer.delay()
 
 main()
-`,
-      },
-    ],
+`
+  return {
+    id: createAlgorithmId(),
+    title: '冒泡排序（Python）',
+    description: 'Python + tracers 可视化冒泡排序。',
+    language: 'python',
+    category: '排序',
+    tags: ['python', 'sort'],
+    favorite: false,
+    createdAt: now,
+    updatedAt: now,
+    source: 'user',
+    files: [{ name: 'bubble_sort.py', content: code }],
+    sourceCode: code,
+    vizCode: code,
+    editorMode: 'viz',
   }
 }
 
 export function makeCppBubbleSort(): Algorithm {
   const now = Date.now()
-  return {
-    id: 'cpp-bubble-sort',
-    title: '冒泡排序（C++）',
-    description: '使用本机 C++ 编译器运行；需在设置中配置编译器。',
-    language: 'cpp',
-    category: '排序',
-    tags: ['cpp', 'sort'],
-    favorite: false,
-    createdAt: now,
-    updatedAt: now,
-    source: 'builtin',
-    files: [
-      {
-        name: 'bubble_sort.cpp',
-        content: `#include "av.h"
+  const code = `#include "av.h"
 #include <vector>
 using namespace av;
 
@@ -81,13 +66,13 @@ int main() {
   VerticalLayout layout({&array1d, &log});
   Layout::setRoot(layout);
   array1d.set(A);
-  Tracer::delay(14);
+  Tracer::delay(11);
 
   int n = (int)A.size();
   for (int i = 0; i < n - 1; ++i) {
     for (int j = 0; j < n - 1 - i; ++j) {
       array1d.select(j, j + 1);
-      Tracer::delay(18);
+      Tracer::delay(17);
       if (A[j] > A[j + 1]) {
         array1d.patch(j, A[j + 1]);
         array1d.patch(j + 1, A[j]);
@@ -101,8 +86,21 @@ int main() {
   }
   return 0;
 }
-`,
-      },
-    ],
+`
+  return {
+    id: 'cpp-bubble-sort',
+    title: '冒泡排序（C++）',
+    description: '使用本机 C++ 编译器运行；需在设置中配置编译器。',
+    language: 'cpp',
+    category: '排序',
+    tags: ['cpp', 'sort'],
+    favorite: false,
+    createdAt: now,
+    updatedAt: now,
+    source: 'builtin',
+    files: [{ name: 'bubble_sort.cpp', content: code }],
+    sourceCode: code,
+    vizCode: code,
+    editorMode: 'viz',
   }
 }

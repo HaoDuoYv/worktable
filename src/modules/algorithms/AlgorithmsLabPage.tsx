@@ -804,9 +804,15 @@ export function AlgorithmsLabPage() {
         </div>
         <div className="algo-lab__mode-bar">
           <span className="algo-lab__hint">
-            {editorMode === 'source'
-              ? '编辑源码；运行时执行已保存的可视化代码'
-              : '可视化代码将直接用于运行'}
+            {playing || cursor > 0
+              ? selected?.sourceCode && selected.sourceCode !== (selected.vizCode ?? '')
+                ? '回放中：编辑器显示源码，高亮行来自 delay(源码行号)'
+                : editorMode === 'source'
+                  ? '编辑源码；运行时执行已保存的可视化代码'
+                  : '可视化代码将直接用于运行'
+              : editorMode === 'source'
+                ? '编辑源码；运行时执行已保存的可视化代码'
+                : '可视化代码将直接用于运行'}
           </span>
         </div>
         <div style={{ padding: '0 12px 8px' }}>
@@ -851,8 +857,15 @@ export function AlgorithmsLabPage() {
         </div>
         <div className="algo-lab__editor-body">
           <CodeEditor
-            value={code}
+            value={(() => {
+              const src = selected?.sourceCode
+              const viz = selected?.vizCode
+              const inPlayback = playing || cursor > 0
+              if (inPlayback && src && src.trim() && src !== viz) return src
+              return code
+            })()}
             onChange={(v) => {
+              if (playing) return
               setCode(v)
               setDirty(true)
             }}

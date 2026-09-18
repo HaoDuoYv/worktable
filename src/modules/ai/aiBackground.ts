@@ -29,11 +29,12 @@ export function startVizConvertJob(opts: {
         '用户源码如下，请转换为带 visualization tracers 的可执行完整代码。',
         `语言：${langName}`,
         langName === 'javascript'
-          ? '必须使用 require("algorithm-visualizer")，Array1DTracer/LogTracer，Tracer.delay()，Layout.setRoot。只输出一个 ```javascript 代码块，不要解释。'
+          ? '必须使用 require("algorithm-visualizer")，Array1DTracer/LogTracer，Tracer.delay(源码行号)，Layout.setRoot。只输出一个 ```javascript 代码块，不要解释。'
           : langName === 'python'
-            ? '直接使用注入的 Array1DTracer/LogTracer/Tracer/Layout，不要 import algorithm_visualizer。只输出一个 ```python 代码块。'
-            : '使用 #include "av.h" 与 av:: 命名空间。只输出一个 ```cpp 代码块。',
+            ? '直接使用注入的 Array1DTracer/LogTracer/Tracer/Layout，不要 import algorithm_visualizer。Tracer.delay(源码行号)。只输出一个 ```python 代码块。'
+            : '使用 #include "av.h" 与 av:: 命名空间，Layout::setRoot、Tracer::delay(源码行号)。只输出一个 ```cpp 代码块。',
         '',
+        '【重要】delay 参数 = 源码 0-based 行号，使播放可视化时能高亮源码对应行。',
         '【源码】',
         langName === 'python' ? '```python' : langName === 'cpp' ? '```cpp' : '```javascript',
         sourceCode,

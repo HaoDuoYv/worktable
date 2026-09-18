@@ -1,6 +1,6 @@
 # Worktable 可视化代码规范（VIS_SPEC）
 
-> 版本：v1.0 · 对齐 `src/core/av/` 命令回放引擎  
+> 版本：v1.3 · 对齐 `src/core/av/` 命令回放引擎  
 > AI 生成 / 人工编写可视化代码，**必须**满足本规范；转换后由 `validateVizCode` 静态校验。
 
 ---
@@ -33,10 +33,12 @@
 | `VerticalLayout` / `HorizontalLayout` | 布局容器 |
 | `setRoot` | 设置根视图（key 可为 tracer 或 layout） |
 | `set` / `patch` / `depatch` | 数据 |
+| `push` / `pop` / `enqueue` / `dequeue` / `unshift` / `shift` | 栈/队列/链表 |
 | `select` / `deselect` / `selectRow`… | 高亮 |
 | `print` / `println` | 日志 |
-| `visit` / `leave` | 图遍历 |
-| `delay` | **必须**：步进点；Worker/注入层会写入行号 |
+| `visit` / `leave` | 图/树遍历 |
+| `rotateLeft` / `rotateRight` / `split` / `setPointer` | 红黑树 / B+ 树 |
+| `delay` | **必须**：步进点；**N=源码 0-based 行号**（用于回放高亮源码） |
 
 **没有 `delay` 则无法分步回放。**
 
@@ -49,6 +51,9 @@
 ```js
 const {
   Array1DTracer, Array2DTracer, LogTracer, GraphTracer, TreeTracer,
+  StackTracer, QueueTracer, LinkedListTracer,
+  CircularQueueTracer, DequeTracer,
+  RedBlackTreeTracer, BPlusTreeTracer, StaticLinkedListTracer,
   Tracer, Layout, VerticalLayout, HorizontalLayout,
 } = require('algorithm-visualizer')
 ```
@@ -81,11 +86,56 @@ const {
 
 - `set(log?)` / `print(msg)` / `println(msg)`  
 
-**GraphTracer**
+**GraphTracer / TreeTracer**
 
-- `set(adjacencyMatrix)`  
-- `visit(target, source?, weight?)` / `leave(...)`  
-- `select(target, source?)` / `deselect(...)`  
+- `set(adjacencyMatrix)`（Tree 用父→子边；无父节点为根）
+- `directed(bool)`
+- `visit(target, source?, weight?)` / `leave(...)`
+- `select(target, source?)` / `deselect(...)`
+
+**StackTracer（栈，LIFO）**
+
+- `set(array1d)` / `push(v)` / `pop()`
+- `select(i)` / `deselect(i)`
+
+**QueueTracer（队列，FIFO）**
+
+- `set(array1d)` / `enqueue(v)` / `dequeue()`
+- `select(i)` / `deselect(i)`
+
+**LinkedListTracer（链表）**
+
+- `set(array1d)` / `push(v)` 尾插 / `unshift(v)` 头插
+- `pop()` / `shift()`
+- `select(i)` / `deselect(i)`
+
+**CircularQueueTracer（环形队列）**
+
+- `init(capacity)` / `enqueue(v)` / `dequeue()`
+- 可选 `set(arr, head, tail)`
+
+**DequeTracer（双端队列）**
+
+- `pushFront(v)` / `popFront()` / `pushBack(v)` / `popBack()`
+
+**RedBlackTreeTracer（红黑树）**
+
+- `set([{ id, parent, left?, right?, color: 'red'|'black', label? }])`
+- `setColor(id, 'red'|'black')` / `visit(id)` / `setLabel(id, text)`
+- `setPointer(id, 'left'|'right'|'parent', childId|null)`
+- `rotateLeft(x)` / `rotateRight(x)`（结构旋转，引擎维护边）
+
+**BPlusTreeTracer（B+ 树）**
+
+- `set([{ id, parent, left?, right?, label }])`（label 可为 `"10|20"`）
+- `visit(id)` / `setLabel(id, text)`
+- `split(oldId, newId, promote, leftLabel?, rightLabel?)`（分裂动画）
+
+**静态链表（StaticLinkedListTracer）**
+
+- `init(n)` / `setData(i, v)` / `setNext(i, v)`
+- 或 `set(dataArray, nextArray)`
+- `select(row, col?)` row=0 data，row=1 next
 
 **Layout**
 
@@ -132,7 +182,7 @@ for (let i = 0; i < A.length; i++) {
 **不要** `import algorithm_visualizer`。  
 工作台在执行前已注入：
 
-`Array1DTracer, Array2DTracer, LogTracer, GraphTracer, TreeTracer, Tracer, Layout, VerticalLayout, HorizontalLayout, visualize`
+`Array1DTracer, Array2DTracer, LogTracer, GraphTracer, TreeTracer, StackTracer, QueueTracer, LinkedListTracer, CircularQueueTracer, DequeTracer, RedBlackTreeTracer, BPlusTreeTracer, StaticLinkedListTracer, Tracer, Layout, VerticalLayout, HorizontalLayout, visualize`
 
 ### 4.2 必选
 
@@ -180,6 +230,8 @@ Python 侧提供 **snake_case 别名** 与部分 JS 风格名，推荐：
 #include <vector>
 using namespace av;
 ```
+
+`av.h` 提供：`LogTracer`、`Array1DTracer`、`GraphTracer`、`TreeTracer`、`StackTracer`、`QueueTracer`、`LinkedListTracer`、`VerticalLayout`、`Layout`、`Tracer`。
 
 ### 5.2 必选
 
@@ -252,6 +304,7 @@ int main() {
 | `js-require-av` | 含 `require('algorithm-visualizer')` 或 `require("algorithm-visualizer")` |
 | `js-forbid-require` | 不得 require 其它模块名 |
 | `js-syntax` | `new Function(code)` 可编译（不执行） |
+| `has-set-root` | `Layout.setRoot` / `set_root` / `Layout::setRoot` |
 
 **Python**
 
@@ -268,6 +321,7 @@ int main() {
 | `cpp-include-av` | 含 `#include "av.h"` |
 | `cpp-using-or-ns` | `using namespace av` 或 `av::` |
 | `cpp-delay` | `Tracer::delay` |
+| `cpp-setroot-syntax` | 不得 `Layout.setRoot`，应为 `Layout::setRoot` |
 
 ### 7.3 产出
 
@@ -301,5 +355,8 @@ interface VizValidateResult {
 | 版本 | 变更 |
 |------|------|
 | v1.0 | 首版：三语言必选结构 + 校验规则表 |
+| v1.1 | 增加 Tree/Stack/Queue/LinkedList Tracer；C++ `Layout::setRoot`；校验 `cpp-setroot-syntax` |
+| v1.2 | 增加 CircularQueue/Deque/RedBlackTree/BPlusTree/StaticLinkedList Tracer 与 JS 示例 |
+| v1.3 | 红黑树 rotate、B+ split；回放 delay 对齐源码行并高亮 |
 
 修改规范时请同步：`src/modules/algorithms/validateViz.ts` 与本文件。

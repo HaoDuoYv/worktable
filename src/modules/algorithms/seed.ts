@@ -19,6 +19,10 @@ export function builtinToAlgorithm(
     updatedAt: now,
     source: 'builtin',
     files: [{ name: `${b.id}.js`, content: b.code }],
+    // 内置示例：源码与可视化代码同一份，delay 行号对齐本文件
+    sourceCode: b.code,
+    vizCode: b.code,
+    editorMode: 'viz',
     ...overrides,
   }
 }

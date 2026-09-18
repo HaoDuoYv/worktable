@@ -191,6 +191,119 @@ class TreeTracer(GraphTracer):
     """Binary tree / hierarchical tree — same protocol as Graph with tree layout."""
 
 
+class _SeqTracer(Tracer):
+    def set(self, array1d: Optional[list] = None) -> None:
+        self._cmd("set", [list(array1d or [])])
+
+    def select(self, sx: int, ex: Optional[int] = None) -> None:
+        args = [sx] if ex is None else [sx, ex]
+        self._cmd("select", args)
+
+    def deselect(self, sx: int, ex: Optional[int] = None) -> None:
+        args = [sx] if ex is None else [sx, ex]
+        self._cmd("deselect", args)
+
+    def patch(self, x: int, v: Any = None) -> None:
+        args: list = [x] if v is None else [x, v]
+        self._cmd("patch", args)
+
+    def depatch(self, x: int) -> None:
+        self._cmd("depatch", [x])
+
+
+class StackTracer(_SeqTracer):
+    def push(self, value: Any) -> None:
+        self._cmd("push", [value])
+
+    def pop(self) -> None:
+        self._cmd("pop", [])
+
+
+class QueueTracer(_SeqTracer):
+    def enqueue(self, value: Any) -> None:
+        self._cmd("enqueue", [value])
+
+    def dequeue(self) -> None:
+        self._cmd("dequeue", [])
+
+
+class LinkedListTracer(_SeqTracer):
+    def push(self, value: Any) -> None:
+        self._cmd("push", [value])
+
+    def unshift(self, value: Any) -> None:
+        self._cmd("unshift", [value])
+
+    def pop(self) -> None:
+        self._cmd("pop", [])
+
+    def shift(self) -> None:
+        self._cmd("shift", [])
+
+
+class CircularQueueTracer(_SeqTracer):
+    def init(self, capacity: int) -> None:
+        self._cmd("init", [int(capacity)])
+
+
+class DequeTracer(_SeqTracer):
+    def push_front(self, value: Any) -> None:
+        self._cmd("pushFront", [value])
+
+    def pop_front(self) -> None:
+        self._cmd("popFront", [])
+
+    def push_back(self, value: Any) -> None:
+        self._cmd("pushBack", [value])
+
+    def pop_back(self) -> None:
+        self._cmd("popBack", [])
+
+
+class StaticLinkedListTracer(Tracer):
+    def init(self, capacity: int) -> None:
+        self._cmd("init", [int(capacity)])
+
+    def set(self, data: Optional[list] = None, nxt: Optional[list] = None) -> None:
+        self._cmd("set", [list(data or []), list(nxt or [])])
+
+    def set_data(self, i: int, v: Any) -> None:
+        self._cmd("setData", [i, v])
+
+    def set_next(self, i: int, v: Any) -> None:
+        self._cmd("setNext", [i, v])
+
+    def select(self, row: int, col: Optional[int] = None) -> None:
+        args = [row] if col is None else [row, col]
+        self._cmd("select", args)
+
+    def deselect(self, row: int, col: Optional[int] = None) -> None:
+        args = [row] if col is None else [row, col]
+        self._cmd("deselect", args)
+
+
+class RedBlackTreeTracer(GraphTracer):
+    def set_color(self, node_id: int, color: str) -> None:
+        self._cmd("setColor", [node_id, color])
+
+    def set_label(self, node_id: int, text: Any) -> None:
+        self._cmd("setLabel", [node_id, text])
+
+    def rotate_left(self, x: int) -> None:
+        self._cmd("rotateLeft", [x])
+
+    def rotate_right(self, x: int) -> None:
+        self._cmd("rotateRight", [x])
+
+
+class BPlusTreeTracer(GraphTracer):
+    def set_label(self, node_id: int, text: Any) -> None:
+        self._cmd("setLabel", [node_id, text])
+
+    def split(self, old_id: int, new_id: int, promote: Any, left_label: Any = None, right_label: Any = None) -> None:
+        self._cmd("split", [old_id, new_id, promote, left_label, right_label])
+
+
 class _Layout(_Commander):
     def __init__(self, children: Optional[list] = None) -> None:
         _Commander.__init__(self)
