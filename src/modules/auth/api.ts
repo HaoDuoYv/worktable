@@ -24,6 +24,44 @@ const OFFICIAL_API_BASE = 'https://dquapi.qzz.io'
 
 export type ApiEndpointMode = 'official' | 'custom'
 
+/**
+ * Normalize a user-entered API base to an absolute origin URL.
+ * Input may be:
+ *   - domain: https://api.example.com
+ *   - host:port → http://host:port
+ *   - already absolute URL
+ * Never returns a bare path (would be joined onto the SPA origin).
+ */
+export function normalizeApiBaseUrl(raw: string): string {
+  let s = (raw || '').trim().replace(/\/+$/, '')
+  if (!s) return ''
+  // strip accidental path-like noise after host for display config; keep full URL if they pass path
+  if (/^\/\//.test(s)) s = 'http:' + s
+  if (!/^https?:\/\//i.test(s)) {
+    // "192.144.141.115:8788" or "api.example.com:8788/path"
+    if (/^[\w.-]+(:\d+)?(\/|$)/.test(s) || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(s)) {
+      s = 'http://' + s
+    } else {
+      // still not parseable as host — prefix http as best effort
+      s = 'http://' + s.replace(/^\/+/, '')
+    }
+  }
+  try {
+    const u = new URL(s)
+    // reject if it equals the page origin + path-only garbage without host
+    if (!u.hostname) return ''
+    // keep path if user provided e.g. https://host/api — we append /api/* anyway so drop trailing /api
+    let out = `${u.protocol}//${u.host}`
+    if (u.pathname && u.pathname !== '/' && !/^\/api$/i.test(u.pathname.replace(/\/+$/, ''))) {
+      // allow sub-path bases like https://host/worktable
+      out = `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, '')}`
+    }
+    return out
+  } catch {
+    return ''
+  }
+}
+
 function readStorage(key: string): string | null {
   try {
     return localStorage.getItem(key)
@@ -53,12 +91,12 @@ export function loadApiMode(): ApiEndpointMode {
 export function loadCustomApiBase(): string {
   const stored = readStorage(API_KEY) || ''
   if (!stored || stored === OFFICIAL_API_BASE || stored === 'http://127.0.0.1:8788') return ''
-  return stored.replace(/\/+$/, '')
+  return normalizeApiBaseUrl(stored)
 }
 
 export function loadApiBase(): string {
   if (loadApiMode() === 'official') return OFFICIAL_API_BASE
-  return loadCustomApiBase() || OFFICIAL_API_BASE
+  return normalizeApiBaseUrl(loadCustomApiBase()) || OFFICIAL_API_BASE
 }
 
 export function saveApiEndpoint(mode: ApiEndpointMode, customUrl?: string): void {
@@ -67,7 +105,7 @@ export function saveApiEndpoint(mode: ApiEndpointMode, customUrl?: string): void
     writeStorage(API_KEY, OFFICIAL_API_BASE)
     return
   }
-  writeStorage(API_KEY, (customUrl ?? loadCustomApiBase()).replace(/\/+$/, ''))
+  writeStorage(API_KEY, normalizeApiBaseUrl(customUrl ?? loadCustomApiBase()))
 }
 
 /** @deprecated prefer saveApiEndpoint */
@@ -108,8 +146,12 @@ export class ApiError extends Error {
 }
 
 async function rawFetch(path: string, init: RequestInit = {}, token?: string) {
-  const base = loadApiBase()
-  const res = await fetch(`${base}${path}`, {
+  const base = normalizeApiBaseUrl(loadApiBase())
+  if (!/^https?:\/\//i.test(base)) {
+    throw new ApiError(0, '云端地址无效，请填写服务器域名或 http://IP:端口')
+  }
+  const url = `${base}${path}`
+  const res = await fetch(url, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -117,6 +159,17 @@ async function rawFetch(path: string, init: RequestInit = {}, token?: string) {
       ...(init.headers || {}),
     },
   })
+  // Domain block / hosting intercept (e.g. DNSPod webblock 302 HTML)
+  if (res.redirected || res.url.includes('webblock') || res.url.includes('dnspod')) {
+    throw new ApiError(
+      res.status,
+      '云端域名被拦截或未备案，请改用自定义服务地址（服务器 IP 或已备案域名）',
+    )
+  }
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('application/json') && res.status === 200) {
+    throw new ApiError(res.status, '云端返回了非 JSON（可能域名被拦截），请改用自定义服务地址')
+  }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     throw new ApiError(res.status, (data as { error?: string }).error || `HTTP ${res.status}`)
