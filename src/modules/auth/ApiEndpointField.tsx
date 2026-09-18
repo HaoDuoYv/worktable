@@ -57,13 +57,13 @@ export function ApiEndpointField() {
               else if (norm && !/^https?:\/\//i.test(v.trim())) setHint(`将请求：${norm}/api/...`)
               else setHint(null)
             }}
-            placeholder="http://192.144.141.115:8788 或 https://api.example.com"
+            placeholder="http://192.168.1.10:8788 或 https://api.example.com"
             spellCheck={false}
             autoComplete="off"
             inputMode="url"
           />
           {hint ? <p className="auth-endpoint__hint">{hint}</p> : null}
-          <p className="auth-endpoint__hint">必须是服务器地址/域名，不能只填 IP 且不要拼接当前网站路径</p>
+          <p className="auth-endpoint__hint">请填写服务器域名或完整地址（可自动补全 http://）</p>
         </>
       ) : (
         <p className="auth-endpoint__hint">使用产品内置的云端同步服务（若域名不可用，请改用自定义地址）</p>

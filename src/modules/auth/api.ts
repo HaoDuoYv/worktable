@@ -38,7 +38,7 @@ export function normalizeApiBaseUrl(raw: string): string {
   // strip accidental path-like noise after host for display config; keep full URL if they pass path
   if (/^\/\//.test(s)) s = 'http:' + s
   if (!/^https?:\/\//i.test(s)) {
-    // "192.144.141.115:8788" or "api.example.com:8788/path"
+    // "192.168.1.10:8788" or "api.example.com:8788/path"
     if (/^[\w.-]+(:\d+)?(\/|$)/.test(s) || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(s)) {
       s = 'http://' + s
     } else {
