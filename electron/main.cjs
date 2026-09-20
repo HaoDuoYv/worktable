@@ -12,6 +12,9 @@ const { pathToFileURL } = require('node:url')
 
 const DEV_URL = process.env.WORKTABLE_DEV_URL || 'http://localhost:5173'
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production'
+/** Stable loopback port so localStorage origin (and login) persists across launches. */
+const APP_PORT = Number(process.env.WORKTABLE_APP_PORT || 21773)
+const APP_PORT_FALLBACKS = [21773, 21774, 21775, 21873]
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null
@@ -124,12 +127,29 @@ function startStaticServer() {
   })
 
   return new Promise((resolve, reject) => {
-    staticServer.once('error', reject)
-    staticServer.listen(0, '127.0.0.1', () => {
-      const addr = staticServer.address()
-      appPort = typeof addr === 'object' && addr ? addr.port : 0
-      resolve(appPort)
-    })
+    const ports = [APP_PORT, ...APP_PORT_FALLBACKS]
+    let i = 0
+    const tryListen = () => {
+      const port = ports[i]
+      if (port == null) {
+        reject(new Error(`端口占用：${ports.join(', ')}，可用 WORKTABLE_APP_PORT 指定其它端口`))
+        return
+      }
+      i += 1
+      const onError = (err) => {
+        staticServer.removeListener('error', onError)
+        if (err && err.code === 'EADDRINUSE') tryListen()
+        else reject(err)
+      }
+      staticServer.once('error', onError)
+      staticServer.listen(port, '127.0.0.1', () => {
+        staticServer.removeListener('error', onError)
+        const addr = staticServer.address()
+        appPort = typeof addr === 'object' && addr ? addr.port : port
+        resolve(appPort)
+      })
+    }
+    tryListen()
   })
 }
 

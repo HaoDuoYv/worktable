@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  ApiError,
   getMe,
   loadSession,
   login as apiLogin,
@@ -31,10 +32,20 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+function isAuthRejection(e: unknown): boolean {
+  if (e instanceof ApiError) return e.status === 401 || e.status === 403
+  return false
+}
+
+function isNetworkish(e: unknown): boolean {
+  if (e instanceof ApiError) return e.status === 0
+  return e instanceof TypeError || e instanceof Error
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<AuthSession | null>(() => loadSession())
 
-  // boot: validate / refresh
+  // boot: validate / refresh — keep local session when network/API is unreachable
   useEffect(() => {
     let cancelled = false
     async function boot() {
@@ -46,19 +57,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSessionState({ ...s, user: me.user })
           saveSession({ ...s, user: me.user })
         }
-      } catch {
-        try {
-          const next = await refreshSession(s.refreshToken)
-          if (!cancelled) {
-            setSessionState(next)
-            saveSession(next)
-          }
-        } catch {
-          if (!cancelled) {
-            setSessionState(null)
-            saveSession(null)
-          }
+        return
+      } catch (e) {
+        // valid rejection → try refresh; network error → keep session
+        if (!isAuthRejection(e) && isNetworkish(e)) {
+          if (!cancelled) setSessionState(s)
+          return
         }
+      }
+      try {
+        const next = await refreshSession(s.refreshToken)
+        if (!cancelled) {
+          setSessionState(next)
+          saveSession(next)
+        }
+      } catch (e) {
+        if (cancelled) return
+        if (!isAuthRejection(e) && isNetworkish(e)) {
+          // Offline / CORS / blocked host: do not wipe login
+          setSessionState(s)
+          return
+        }
+        setSessionState(null)
+        saveSession(null)
       }
     }
     void boot()
