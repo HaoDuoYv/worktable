@@ -39,40 +39,40 @@
   --shadow-2: 0 8px 24px rgba(15, 23, 42, 0.12);
 }
 
-/* —— Dark (default, IDE) —— */
+/* —— Dark (default, IDE / VS Code 深色体系) —— */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --ink-950: #0b1220;
-  --ink-900: #111827;
-  --ink-800: #1f2937;
-  --ink-700: #374151;
-  --line: #374151;
-  --line-strong: #4b5563;
+  --ink-950: #1e1e1e;
+  --ink-900: #252526;
+  --ink-800: #2d2d30;
+  --ink-700: #3f3f46;
+  --line: #3f3f46;
+  --line-strong: #52525b;
 
-  --text: #f9fafb;
-  --text-muted: #d1d5db;
-  --text-subtle: #9ca3af;
+  --text: #e4e4e7;
+  --text-muted: #9d9d9d;
+  --text-subtle: #6a6a6a;
 
-  --accent: #60a5fa;
-  --accent-soft: rgba(96, 165, 250, 0.16);
-  --accent-fg: #0b1220;
-  --signal: #34d399;
-  --signal-soft: rgba(52, 211, 153, 0.16);
-  --warn: #fbbf24;
-  --danger: #f87171;
-  --focus: #93c5fd;
+  --accent: #007acc;
+  --accent-soft: rgba(0, 122, 204, 0.16);
+  --accent-fg: #ffffff;
+  --signal: #4ec9b0;
+  --signal-soft: rgba(78, 201, 176, 0.16);
+  --warn: #dcdcaa;
+  --danger: #f85149;
+  --focus: #4a9ede;
 
   --diff-add-bg: #14301f;
   --diff-add-fg: #86efac;
   --diff-del-bg: #331818;
   --diff-del-fg: #fca5a5;
 
-  --panel: #111827;
-  --panel-2: #1f2937;
-  --canvas: #030712;
-  --elevated: #1f2937;
+  --panel: #252526;
+  --panel-2: #2d2d30;
+  --canvas: #181818;
+  --elevated: #2d2d30;
 }
 
 /* —— Light (day / paper) —— */
@@ -246,31 +246,31 @@ a:hover {
 /* 克隆层必须独立声明旧主题变量，避免继承 html 上的新主题 */
 .theme-clone-overlay[data-theme='dark'] {
   color-scheme: dark;
-  --ink-950: #0b1220;
-  --ink-900: #111827;
-  --ink-800: #1f2937;
-  --ink-700: #374151;
-  --line: #374151;
-  --line-strong: #4b5563;
-  --text: #f9fafb;
-  --text-muted: #d1d5db;
-  --text-subtle: #9ca3af;
-  --accent: #60a5fa;
-  --accent-soft: rgba(96, 165, 250, 0.16);
-  --accent-fg: #0b1220;
-  --signal: #34d399;
-  --signal-soft: rgba(52, 211, 153, 0.16);
-  --warn: #fbbf24;
-  --danger: #f87171;
-  --focus: #93c5fd;
+  --ink-950: #1e1e1e;
+  --ink-900: #252526;
+  --ink-800: #2d2d30;
+  --ink-700: #3f3f46;
+  --line: #3f3f46;
+  --line-strong: #52525b;
+  --text: #e4e4e7;
+  --text-muted: #9d9d9d;
+  --text-subtle: #6a6a6a;
+  --accent: #007acc;
+  --accent-soft: rgba(0, 122, 204, 0.16);
+  --accent-fg: #ffffff;
+  --signal: #4ec9b0;
+  --signal-soft: rgba(78, 201, 176, 0.16);
+  --warn: #dcdcaa;
+  --danger: #f85149;
+  --focus: #4a9ede;
   --diff-add-bg: #14301f;
   --diff-add-fg: #86efac;
   --diff-del-bg: #331818;
   --diff-del-fg: #fca5a5;
-  --panel: #111827;
-  --panel-2: #1f2937;
-  --canvas: #030712;
-  --elevated: #1f2937;
+  --panel: #252526;
+  --panel-2: #2d2d30;
+  --canvas: #181818;
+  --elevated: #2d2d30;
   background: var(--ink-950);
   color: var(--text);
 }

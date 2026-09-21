@@ -1,47 +1,195 @@
-/* Algorithm lab layout */
+﻿/* Algorithm lab layout — dockable panel system */
 
 .algo-lab {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
   background: var(--ink-950);
   position: relative;
 }
 
-.algo-lab__nav {
-  border-right: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, var(--ink-900) 0%, color-mix(in srgb, var(--ink-900) 97%, var(--accent-soft)) 100%);
-  display: flex;
-  flex-direction: column;
+.algo-lab__workspace {
+  flex: 1;
   min-height: 0;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
 }
 
-.algo-lab__nav-head {
-  padding: 16px 14px;
-  border-bottom: 1px solid var(--line);
+/* —— Panel primitives —— */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.algo-lab__nav-title {
-  font-weight: 700;
-  font-size: var(--text-lg);
+.panel-chrome {
+  flex: none;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 0 6px 0 10px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
 }
 
-.algo-lab__nav-title::before {
+.panel-chrome__grip {
+  color: var(--text-subtle);
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  flex: none;
+}
+
+.panel-chrome__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex: none;
+}
+
+.panel-chrome__sub {
+  font-size: 11px;
+  color: var(--text-subtle);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.panel-chrome__spacer {
+  flex: 1;
+  min-width: 4px;
+}
+
+.panel-chrome .select-menu {
+  flex: none;
+}
+
+.panel-rail {
+  flex: none;
+  width: 48px;
+  align-items: center;
+  padding: 8px 0;
+  gap: 8px;
+}
+
+.panel-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.panel-foot__lang {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  flex: none;
+}
+
+/* —— Split handles between panels —— */
+.algo-lab__split {
+  border-radius: 2px;
+  background: transparent;
+  position: relative;
+}
+
+.algo-lab__split::after {
   content: '';
-  width: 3px;
-  height: 18px;
-  border-radius: 999px;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--ink-700);
+  transition: background var(--dur-fast) var(--ease-ui);
+}
+
+.algo-lab__split:hover::after,
+.algo-lab__split:focus-visible::after {
   background: var(--accent);
-  flex-shrink: 0;
+}
+
+.algo-lab__split.resize-handle--x {
+  width: 6px;
+  margin: 0 -1px;
+}
+
+/* —— Status bar —— */
+.algo-lab__statusbar {
+  flex: none;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.algo-lab__status-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.algo-lab__status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-fg);
+  flex: none;
+}
+
+.algo-lab__status-dot.is-busy {
+  animation: step-dot-pulse 1s ease-in-out infinite;
+}
+
+.algo-lab__status-dot.is-error {
+  background: var(--danger);
+}
+
+/* —— Mobile segmented control (hidden on desktop) —— */
+.algo-lab__seg {
+  display: none;
+}
+
+.algo-lab__nav {
+  flex: none;
+  width: var(--lib-w, 260px);
+}
+
+.algo-lab__nav-head {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .algo-lab__list {
@@ -118,34 +266,183 @@
 }
 
 .algo-lab__viz {
-  display: flex;
-  flex-direction: column;
+  flex: 1;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--line);
-}
-
-.algo-lab__viz-head {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
-  background:
-    linear-gradient(135deg, var(--ink-900) 0%, color-mix(in srgb, var(--ink-900) 92%, var(--accent-soft)) 100%);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.algo-lab__viz-title {
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 700;
 }
 
 .algo-lab__viz-desc {
-  margin: 4px 0 0;
+  margin: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* —— 关键变量标志区 —— */
+.viz-vars {
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.viz-vars__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 0;
+}
+
+.viz-vars__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.viz-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.viz-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.viz-legend__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.viz-legend__dot--compare {
+  background: var(--accent);
+}
+
+.viz-legend__dot--swap {
+  background: var(--signal);
+}
+
+.viz-vars__empty {
+  padding: 8px 12px 10px;
+  color: var(--text-subtle);
+  font-size: var(--text-xs);
+}
+
+.viz-vars .var-inspector {
+  border-bottom: 0;
+  background: transparent;
+}
+
+/* —— 日志区 —— */
+.viz-logsec {
+  flex: none;
+  height: 168px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  min-height: 0;
+}
+
+.viz-logsec__bar {
+  flex: none;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.viz-logsec__tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viz-logsec__tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-ui),
+    background var(--dur-fast) var(--ease-ui);
+}
+
+.viz-logsec__tab:hover {
+  color: var(--text);
+}
+
+.viz-logsec__tab.is-active {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--ink-700);
+}
+
+.viz-logsec__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.viz-logsec__body .viz-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.viz-logsec__body .viz-panel__title {
+  display: none;
+}
+
+.viz-logsec__empty {
+  padding: 12px;
+  color: var(--text-subtle);
+  font-size: var(--text-xs);
+}
+
+.viz-logsec__stats {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.viz-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.viz-stat__label {
+  color: var(--text-muted);
+}
+
+.viz-stat__value {
+  font-family: var(--font-mono);
+  color: var(--signal);
+  font-weight: 600;
 }
 
 .algo-lab__canvas {
@@ -669,10 +966,8 @@
 
 /* Editor column */
 .algo-lab__editor {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
+  flex: none;
+  width: var(--code-w, 420px);
 }
 
 .algo-lab__editor-head {
@@ -750,40 +1045,72 @@
 }
 
 @media (max-width: 1100px) {
-  .algo-lab {
-    grid-template-columns: 220px minmax(0, 1fr);
-    grid-template-rows: minmax(220px, 1fr) minmax(220px, 1fr);
-    grid-template-areas:
-      "nav viz"
-      "nav editor";
-  }
-
   .algo-lab__nav {
-    grid-area: nav;
-  }
-
-  .algo-lab__viz {
-    grid-area: viz;
+    width: var(--lib-w, 220px);
   }
 
   .algo-lab__editor {
-    grid-area: editor;
+    width: var(--code-w, 340px);
+  }
+
+  .panel-foot > span:first-child {
+    display: none;
   }
 }
 
 @media (max-width: 768px) {
-  .algo-lab {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
-    grid-template-areas: none;
-    padding-bottom: 56px;
+  .algo-lab__seg {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .algo-lab__seg-btn {
+    flex: 1;
+    height: 34px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--ink-950);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      color var(--dur-fast) var(--ease-ui),
+      background var(--dur-fast) var(--ease-ui),
+      border-color var(--dur-fast) var(--ease-ui);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .algo-lab__seg-btn.is-active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 600;
+  }
+
+  .algo-lab__workspace {
+    display: block;
+    padding: 0;
+  }
+
+  .algo-lab__split,
+  .panel-rail,
+  .algo-lab__statusbar {
+    display: none;
   }
 
   .algo-lab__nav,
   .algo-lab__viz,
   .algo-lab__editor {
-    grid-area: 1 / 1 / 2 / 2;
     display: none;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
   }
 
   .algo-lab[data-mobile-tab='library'] .algo-lab__nav {
@@ -798,17 +1125,24 @@
     display: flex;
   }
 
-  .algo-lab__mobile-tabs {
+  /* 折叠状态在移动端退化为整页图标栏，点按即展开 */
+  .algo-lab[data-mobile-tab='library'] .panel-rail--lib,
+  .algo-lab[data-mobile-tab='code'] .panel-rail--code {
     display: flex;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 24px 0;
+    gap: 12px;
   }
 
   .algo-lab__nav-head {
     padding: 12px;
     gap: 8px;
-  }
-
-  .algo-lab__nav-title {
-    font-size: var(--text-md);
   }
 
   .algo-lab__editor-head {
@@ -950,47 +1284,9 @@ li.is-pending-delete .algo-item {
   outline: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
 }
 
-/* —— Mobile tab bar —— */
+/* —— Mobile tab bar (replaced by top segmented control) —— */
 .algo-lab__mobile-tabs {
   display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  background: var(--ink-900);
-  border-top: 1px solid var(--line);
-  z-index: 30;
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 4px env(safe-area-inset-bottom, 0);
-}
-
-.algo-lab__mobile-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  height: 100%;
-  flex: 1;
-  border: 0;
-  background: transparent;
-  color: var(--text-subtle);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color var(--dur-fast) var(--ease-ui);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.algo-lab__mobile-tab.is-active {
-  color: var(--accent);
-}
-
-.algo-lab__mobile-tab svg {
-  width: 22px;
-  height: 22px;
 }
 
 /* —— Variable inspector —— */

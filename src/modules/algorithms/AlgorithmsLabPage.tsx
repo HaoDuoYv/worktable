@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ChipRow, type ChipOption } from '@/components/Chip'
 import { CodeEditor } from '@/components/CodeEditor'
 import { PlayerBar, type Speed } from '@/components/PlayerBar'
@@ -7,6 +7,8 @@ import { IconButton } from '@/components/IconButton'
 import { Icon } from '@/components/Icon'
 import { SelectMenu } from '@/components/SelectMenu'
 import { Disclosure } from '@/components/Disclosure'
+import { Switch } from '@/components/Switch'
+import { ResizeHandle, usePersistedWidth } from '@/components/Resizable'
 import { AvEngine } from '@/core/av/engine'
 import { TracerPanel, VariableInspector } from '@/core/av/renderers'
 import type { AvCommand } from '@/core/av/types'
@@ -46,6 +48,96 @@ const FILTER_OPTIONS: ChipOption<FilterMode>[] = [
 ]
 
 const BASE_INTERVAL = 450
+
+/* —— Dockable panel system (布局重构) —— */
+
+type LayoutPreset = 'default' | 'focus' | 'code' | 'custom'
+
+const LAYOUT_ITEMS = [
+  { value: 'default' as const, label: '默认布局', icon: 'overview' as const, hint: '算法库 + 可视化 + 代码' },
+  { value: 'focus' as const, label: '专注可视化', icon: 'eye' as const, hint: '两侧折叠为图标栏' },
+  { value: 'code' as const, label: '双列代码', icon: 'code' as const, hint: '收起算法库，加宽代码' },
+  { value: 'custom' as const, label: '自定义', icon: 'settings' as const, hint: '当前为手动调整' },
+]
+
+const LIB_MIN = 200
+const LIB_MAX = 480
+const CODE_MIN = 300
+const CODE_MAX = 720
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
+}
+
+/** Persisted boolean flag in localStorage. */
+function usePersistedFlag(key: string, fallback: boolean) {
+  const [value, setValue] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key)
+      return raw === null ? fallback : raw === '1'
+    } catch {
+      return fallback
+    }
+  })
+  const set = useCallback(
+    (next: boolean) => {
+      setValue(next)
+      try {
+        localStorage.setItem(key, next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+    },
+    [key],
+  )
+  return [value, set] as const
+}
+
+/** Six-dot drag grip shown on every panel chrome (visual affordance for panel dragging). */
+function GripIcon() {
+  return (
+    <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
+      <circle cx="2.5" cy="2.5" r="1.3" />
+      <circle cx="7.5" cy="2.5" r="1.3" />
+      <circle cx="2.5" cy="7" r="1.3" />
+      <circle cx="7.5" cy="7" r="1.3" />
+      <circle cx="2.5" cy="11.5" r="1.3" />
+      <circle cx="7.5" cy="11.5" r="1.3" />
+    </svg>
+  )
+}
+
+/** Unified panel title bar: drag grip + title + optional subtitle + right actions + collapse. */
+function PanelChrome({
+  title,
+  subtitle,
+  right,
+  onCollapse,
+  collapseLabel,
+}: {
+  title: string
+  subtitle?: string
+  right?: ReactNode
+  onCollapse?: () => void
+  collapseLabel?: string
+}) {
+  return (
+    <div className="panel-chrome">
+      <span className="panel-chrome__grip" aria-hidden="true" title="面板区域可拖拽调整">
+        <GripIcon />
+      </span>
+      <span className="panel-chrome__title">{title}</span>
+      {subtitle ? <span className="panel-chrome__sub">{subtitle}</span> : null}
+      <span className="panel-chrome__spacer" />
+      {right}
+      {onCollapse ? (
+        <IconButton label={collapseLabel ?? '折叠面板'} onClick={onCollapse}>
+          <Icon name="chevron-down" size={16} className="panel-chrome__fold-icon" />
+        </IconButton>
+      ) : null}
+    </div>
+  )
+}
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -87,6 +179,18 @@ export function AlgorithmsLabPage() {
   const [activeLine, setActiveLine] = useState<number | null>(null)
   const [tracers, setTracers] = useState<ReturnType<AvEngine['getAll']>>([])
 
+  /* —— Panel layout state (persisted) —— */
+  const [libW, setLibW] = usePersistedWidth('algolab.lib.w', 260)
+  const [codeW, setCodeW] = usePersistedWidth('algolab.code.w', 420)
+  const [libCollapsed, setLibCollapsed] = usePersistedFlag('algolab.lib.collapsed', false)
+  const [codeCollapsed, setCodeCollapsed] = usePersistedFlag('algolab.code.collapsed', false)
+  const [preset, setPreset] = useState<LayoutPreset>('default')
+  const [logTab, setLogTab] = useState<'log' | 'stats'>('log')
+  const [autoScroll, setAutoScroll] = usePersistedFlag('algolab.log.autoscroll', true)
+  const libStart = useRef(libW)
+  const codeStart = useRef(codeW)
+  const logBodyRef = useRef<HTMLDivElement | null>(null)
+
   const engineRef = useRef(new AvEngine())
   const timerRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -96,6 +200,53 @@ export function AlgorithmsLabPage() {
     () => items.find((a) => a.id === selectedId) ?? null,
     [items, selectedId],
   )
+
+  /* —— Derived view state for the panel layout —— */
+  const langLabel =
+    (selected?.language ?? lang) === 'python'
+      ? 'Python'
+      : (selected?.language ?? lang) === 'cpp'
+        ? 'C++'
+        : 'JavaScript'
+
+  /** Log tracers render in the dedicated log section; everything else stays on the canvas. */
+  const vizTracers = useMemo(() => tracers.filter((t) => t.kind !== 'LogTracer'), [tracers])
+  const logTracers = useMemo(() => tracers.filter((t) => t.kind === 'LogTracer'), [tracers])
+  const logLineCount = useMemo(
+    () =>
+      logTracers.reduce((n, t) => n + (t.log ? t.log.split('\n').filter(Boolean).length : 0), 0),
+    [logTracers],
+  )
+
+  const markCustom = useCallback(() => setPreset('custom'), [])
+
+  const applyPreset = useCallback(
+    (p: LayoutPreset) => {
+      if (p === 'custom') return
+      if (p === 'default') {
+        setLibCollapsed(false)
+        setCodeCollapsed(false)
+        setLibW(260)
+        setCodeW(420)
+      } else if (p === 'focus') {
+        setLibCollapsed(true)
+        setCodeCollapsed(true)
+      } else if (p === 'code') {
+        setLibCollapsed(true)
+        setCodeCollapsed(false)
+        setCodeW(560)
+      }
+      setPreset(p)
+    },
+    [setCodeCollapsed, setCodeW, setLibCollapsed, setLibW],
+  )
+
+  // Auto-scroll the log section to the latest line while replaying
+  useEffect(() => {
+    if (!autoScroll || logTab !== 'log') return
+    const el = logBodyRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [tracers, autoScroll, logTab])
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
@@ -534,203 +685,368 @@ export function AlgorithmsLabPage() {
 
   return (
     <div className={`algo-lab${aiOpen ? ' has-inline-ai' : ''}`} data-mobile-tab={mobileTab}>
-      <aside className="algo-lab__nav">
-        <div className="algo-lab__nav-head">
-          <div className="algo-lab__nav-title">算法库</div>
-          <ChipRow ariaLabel="语言" options={LANG_OPTIONS} value={lang} onChange={setLang} />
-          <ChipRow ariaLabel="筛选" options={FILTER_OPTIONS} value={filter} onChange={setFilter} />
-          <input
-            className="algo-search"
-            placeholder="搜索标题、标签…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select
-            className="algo-select"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            aria-label="分类"
+      <nav className="algo-lab__seg" aria-label="面板切换">
+        {(
+          [
+            ['viz', '可视化'],
+            ['code', '代码'],
+            ['library', '算法库'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`algo-lab__seg-btn${mobileTab === key ? ' is-active' : ''}`}
+            onClick={() => setMobileTab(key)}
           >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c === 'all' ? '全部分类' : c}
-              </option>
-            ))}
-          </select>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <Button size="sm" variant="primary" onClick={() => void handleNew()}>
-              新建
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => void handleExport()}>
-              导出
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => fileInputRef.current?.click()}>
-              导入
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) void handleImportFile(f)
-                e.target.value = ''
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="algo-lab__workspace">
+        {libCollapsed ? (
+          <aside className="panel panel-rail panel-rail--lib" aria-label="算法库已折叠">
+            <IconButton
+              label="展开算法库"
+              onClick={() => {
+                setLibCollapsed(false)
+                markCustom()
               }}
-            />
-          </div>
-        </div>
-        <div className="bulk-bar">
-          <Button
-            size="sm"
-            variant={bulkMode ? 'primary' : 'ghost'}
-            onClick={() => {
-              setBulkMode((m) => !m)
-              setBulkIds(new Set())
-            }}
+            >
+              <Icon name="algorithms" size={18} />
+            </IconButton>
+            <IconButton
+              label="新建算法"
+              onClick={() => {
+                setLibCollapsed(false)
+                markCustom()
+                void handleNew()
+              }}
+            >
+              <Icon name="save-copy" size={18} />
+            </IconButton>
+          </aside>
+        ) : (
+          <aside
+            className="panel algo-lab__nav"
+            style={{ '--lib-w': `${libW}px` } as CSSProperties}
           >
-            {bulkMode ? '退出多选' : '多选'}
-          </Button>
-          {bulkMode ? (
-            <>
-              <Button size="sm" variant="ghost" onClick={selectAllVisible}>
-                全选
-              </Button>
+            <PanelChrome
+              title="算法库"
+              subtitle={`${visible.length} 项`}
+              onCollapse={() => {
+                setLibCollapsed(true)
+                markCustom()
+              }}
+              collapseLabel="折叠算法库"
+            />
+            <div className="algo-lab__nav-head">
+              <ChipRow ariaLabel="语言" options={LANG_OPTIONS} value={lang} onChange={setLang} />
+              <ChipRow ariaLabel="筛选" options={FILTER_OPTIONS} value={filter} onChange={setFilter} />
+              <input
+                className="algo-search"
+                placeholder="搜索标题、标签…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <select
+                className="algo-select"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                aria-label="分类"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c === 'all' ? '全部分类' : c}
+                  </option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <Button size="sm" variant="primary" onClick={() => void handleNew()}>
+                  新建
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => void handleExport()}>
+                  导出
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => fileInputRef.current?.click()}>
+                  导入
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) void handleImportFile(f)
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+            </div>
+            <div className="bulk-bar">
               <Button
                 size="sm"
-                variant="danger"
-                disabled={bulkIds.size === 0}
-                onClick={() => void handleBulkDelete()}
+                variant={bulkMode ? 'primary' : 'ghost'}
+                onClick={() => {
+                  setBulkMode((m) => !m)
+                  setBulkIds(new Set())
+                }}
               >
-                删除所选（{bulkIds.size}）
+                {bulkMode ? '退出多选' : '多选'}
               </Button>
+              {bulkMode ? (
+                <>
+                  <Button size="sm" variant="ghost" onClick={selectAllVisible}>
+                    全选
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={bulkIds.size === 0}
+                    onClick={() => void handleBulkDelete()}
+                  >
+                    删除所选（{bulkIds.size}）
+                  </Button>
+                </>
+              ) : (
+                <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
+                  {visible.length} 项
+                </span>
+              )}
+            </div>
+            <ul className="algo-lab__list">
+              {visible.map((a, idx) => (
+                <li
+                  key={a.id}
+                  className={[
+                    pendingDeleteId === a.id ? 'is-pending-delete' : '',
+                    exitingId === a.id ? 'is-exiting' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
+                  <div
+                    className={`algo-item${a.id === selectedId ? ' is-active' : ''}${
+                      exitingId === a.id ? ' is-exiting' : ''
+                    }`}
+                    style={bulkMode ? { animationDelay: `${idx * 12}ms` } : undefined}
+                  >
+                    <span className="trash-zone" aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M4 7h16M9 7V5h6v2M8 7l1 12h6l1-12"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </span>
+                    {bulkMode ? (
+                      <button
+                        type="button"
+                        className="algo-item__main"
+                        onClick={() => toggleBulk(a.id)}
+                        aria-label={`选择 ${a.title}`}
+                      >
+                        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span className={`bulk-check${bulkIds.has(a.id) ? ' is-checked' : ''}`}>
+                            {bulkIds.has(a.id) ? '✓' : ''}
+                          </span>
+                          <span className="algo-item__title">{a.title}</span>
+                        </span>
+                        <span className="algo-item__meta">
+                          {a.category} · {a.tags.slice(0, 2).join(' / ') || '无标签'}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="algo-item__main"
+                        onClick={() => setSelectedId(a.id)}
+                      >
+                        <span className="algo-item__title">
+                          {a.favorite ? '★ ' : ''}
+                          {a.title}
+                        </span>
+                        <span className="algo-item__meta">
+                          {a.category} · {a.tags.slice(0, 2).join(' / ') || '无标签'}
+                        </span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="algo-item__del"
+                      title="删除"
+                      aria-label={`删除 ${a.title}`}
+                      onClick={() => setPendingDeleteId(a.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {pendingDeleteId === a.id ? (
+                    <div className="algo-item__confirm">
+                      <span>确认删除？</span>
+                      <Button size="sm" variant="danger" onClick={() => void handleDelete(a.id)}>
+                        删除
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setPendingDeleteId(null)}>
+                        取消
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+              {visible.length === 0 ? (
+                <li className="algo-empty">没有匹配的算法</li>
+              ) : null}
+            </ul>
+            <div className="algo-lab__nav-foot">数据保存在本机，可导出备份</div>
+          </aside>
+        )}
+
+        <ResizeHandle
+          label="调整算法库面板宽度"
+          className="algo-lab__split"
+          onStart={() => {
+            libStart.current = libW
+          }}
+          onDrag={(delta) => {
+            if (libCollapsed) return
+            setLibW(clamp(libStart.current + delta, LIB_MIN, LIB_MAX))
+            markCustom()
+          }}
+        />
+
+      <section className="panel algo-lab__viz">
+        <PanelChrome
+          title="可视化"
+          subtitle={selected ? `${selected.title} · ${langLabel}` : '选择或新建算法'}
+          right={
+            <>
+              {total > 0 && (
+                <span className="viz-step-badge">
+                  <span className="viz-step-badge__dot" aria-hidden="true" />
+                  {Math.min(cursor, total)} / {total}
+                </span>
+              )}
+              {activeLine != null && <span className="viz-step-line">行 {activeLine}</span>}
+              <SelectMenu
+                ariaLabel="布局预设"
+                items={LAYOUT_ITEMS}
+                value={preset}
+                onChange={(p) => applyPreset(p)}
+              />
+              <IconButton label="重置布局" onClick={() => applyPreset('default')}>
+                <Icon name="settings" size={16} />
+              </IconButton>
             </>
+          }
+        />
+
+        {selected?.description ? (
+          <p className="algo-lab__viz-desc">{selected.description}</p>
+        ) : null}
+
+        <div className="viz-vars">
+          <div className="viz-vars__head">
+            <span className="viz-vars__label">关键变量标志</span>
+            <span className="viz-legend" aria-hidden="true">
+              <span className="viz-legend__item">
+                <i className="viz-legend__dot viz-legend__dot--compare" />
+                比较 / 选中
+              </span>
+              <span className="viz-legend__item">
+                <i className="viz-legend__dot viz-legend__dot--swap" />
+                写入 / 交换
+              </span>
+            </span>
+          </div>
+          {tracers.length > 0 ? (
+            <VariableInspector tracers={tracers} />
           ) : (
-            <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>{visible.length} 项</span>
+            <div className="viz-vars__empty">运行算法后，此处实时显示关键变量</div>
           )}
         </div>
-        <ul className="algo-lab__list">
-          {visible.map((a, idx) => (
-            <li
-              key={a.id}
-              className={[
-                pendingDeleteId === a.id ? 'is-pending-delete' : '',
-                exitingId === a.id ? 'is-exiting' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <div
-                className={`algo-item${a.id === selectedId ? ' is-active' : ''}${
-                  exitingId === a.id ? ' is-exiting' : ''
-                }`}
-                style={bulkMode ? { animationDelay: `${idx * 12}ms` } : undefined}
-              >
-                <span className="trash-zone" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M4 7h16M9 7V5h6v2M8 7l1 12h6l1-12"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
-                {bulkMode ? (
-                  <button
-                    type="button"
-                    className="algo-item__main"
-                    onClick={() => toggleBulk(a.id)}
-                    aria-label={`选择 ${a.title}`}
-                  >
-                    <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span className={`bulk-check${bulkIds.has(a.id) ? ' is-checked' : ''}`}>
-                        {bulkIds.has(a.id) ? '✓' : ''}
-                      </span>
-                      <span className="algo-item__title">{a.title}</span>
-                    </span>
-                    <span className="algo-item__meta">
-                      {a.category} · {a.tags.slice(0, 2).join(' / ') || '无标签'}
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="algo-item__main"
-                    onClick={() => setSelectedId(a.id)}
-                  >
-                    <span className="algo-item__title">
-                      {a.favorite ? '★ ' : ''}
-                      {a.title}
-                    </span>
-                    <span className="algo-item__meta">
-                      {a.category} · {a.tags.slice(0, 2).join(' / ') || '无标签'}
-                    </span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="algo-item__del"
-                  title="删除"
-                  aria-label={`删除 ${a.title}`}
-                  onClick={() => setPendingDeleteId(a.id)}
-                >
-                  ×
-                </button>
-              </div>
-              {pendingDeleteId === a.id ? (
-                <div className="algo-item__confirm">
-                  <span>确认删除？</span>
-                  <Button size="sm" variant="danger" onClick={() => void handleDelete(a.id)}>
-                    删除
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setPendingDeleteId(null)}>
-                    取消
-                  </Button>
-                </div>
-              ) : null}
-            </li>
-          ))}
-          {visible.length === 0 ? (
-            <li className="algo-empty">没有匹配的算法</li>
-          ) : null}
-        </ul>
-        <div className="algo-lab__nav-foot">数据保存在本机，可导出备份</div>
-      </aside>
 
-      <section className="algo-lab__viz">
-        <div className="algo-lab__viz-head">
-          <div>
-            <h2 className="algo-lab__viz-title">可视化</h2>
-            <p className="algo-lab__viz-desc">{selected?.description ?? '选择或新建算法'}</p>
-          </div>
-          <div className="viz-step-info">
-            {total > 0 && (
-              <span className="viz-step-badge">
-                <span className="viz-step-badge__dot" aria-hidden="true" />
-                {Math.min(cursor, total)} / {total}
-              </span>
-            )}
-            {activeLine != null && (
-              <span className="viz-step-line">行 {activeLine}</span>
-            )}
-          </div>
-        </div>
-        {tracers.length > 0 && <VariableInspector tracers={tracers} />}
         <div className="algo-lab__canvas">
           {tracers.length === 0 ? (
             <div className="viz-placeholder">
               <p>运行算法并逐步查看可视化过程。</p>
               <p className="viz-placeholder__hint">支持 Array1D / Array2D / Log / Graph</p>
             </div>
+          ) : vizTracers.length === 0 ? (
+            <div className="viz-placeholder">
+              <p>本次运行仅包含日志输出，请查看下方日志区。</p>
+            </div>
           ) : (
             <div className="viz-stack">
-              {tracers.map((t) => (
+              {vizTracers.map((t) => (
                 <TracerPanel key={t.key} state={t} />
               ))}
             </div>
           )}
         </div>
+
+        <div className="viz-logsec">
+          <div className="viz-logsec__bar">
+            <div className="viz-logsec__tabs" role="tablist" aria-label="日志与统计">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={logTab === 'log'}
+                className={`viz-logsec__tab${logTab === 'log' ? ' is-active' : ''}`}
+                onClick={() => setLogTab('log')}
+              >
+                日志
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={logTab === 'stats'}
+                className={`viz-logsec__tab${logTab === 'stats' ? ' is-active' : ''}`}
+                onClick={() => setLogTab('stats')}
+              >
+                统计
+              </button>
+            </div>
+            <Switch checked={autoScroll} onChange={setAutoScroll} label="自动滚动" />
+          </div>
+          {logTab === 'log' ? (
+            <div className="viz-logsec__body" ref={logBodyRef}>
+              {logTracers.length === 0 ? (
+                <div className="viz-logsec__empty">
+                  暂无日志 — 在代码中使用 LogTracer.println() 输出
+                </div>
+              ) : (
+                logTracers.map((t) => <TracerPanel key={t.key} state={t} />)
+              )}
+            </div>
+          ) : (
+            <div className="viz-logsec__body viz-logsec__stats">
+              <div className="viz-stat">
+                <span className="viz-stat__label">播放进度</span>
+                <span className="viz-stat__value">
+                  {Math.min(cursor, total)} / {total} 步
+                </span>
+              </div>
+              <div className="viz-stat">
+                <span className="viz-stat__label">Tracer 面板</span>
+                <span className="viz-stat__value">{tracers.length}</span>
+              </div>
+              <div className="viz-stat">
+                <span className="viz-stat__label">日志行数</span>
+                <span className="viz-stat__value">{logLineCount}</span>
+              </div>
+              <div className="viz-stat">
+                <span className="viz-stat__label">播放速度</span>
+                <span className="viz-stat__value">{speed}×</span>
+              </div>
+            </div>
+          )}
+        </div>
+
         <PlayerBar
           playing={playing}
           cursor={cursor}
@@ -751,184 +1067,206 @@ export function AlgorithmsLabPage() {
         />
       </section>
 
-      <section className="algo-lab__editor">
-        <div className="algo-lab__editor-head">
-          <input
-            className="algo-title-input"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              setDirty(true)
+      <ResizeHandle
+        label="调整代码面板宽度"
+        className="algo-lab__split"
+        onStart={() => {
+          codeStart.current = codeW
+        }}
+        onDrag={(delta) => {
+          if (codeCollapsed) return
+          setCodeW(clamp(codeStart.current - delta, CODE_MIN, CODE_MAX))
+          markCustom()
+        }}
+      />
+
+      {codeCollapsed ? (
+        <aside className="panel panel-rail panel-rail--code" aria-label="代码面板已折叠">
+          <IconButton
+            label="展开代码面板"
+            onClick={() => {
+              setCodeCollapsed(false)
+              markCustom()
             }}
-            placeholder="算法标题"
-            disabled={!selected}
+          >
+            <Icon name="code" size={18} />
+          </IconButton>
+        </aside>
+      ) : (
+        <section
+          className="panel algo-lab__editor"
+          style={{ '--code-w': `${codeW}px` } as CSSProperties}
+        >
+          <PanelChrome
+            title="代码"
+            subtitle={selected?.files[0]?.name ?? ''}
+            onCollapse={() => {
+              setCodeCollapsed(true)
+              markCustom()
+            }}
+            collapseLabel="折叠代码面板"
           />
-          <div className="algo-lab__editor-actions">
-            <span className="algo-lab__hint">{dirty ? '未保存' : '已保存'}</span>
-            <SelectMenu
-              ariaLabel="编辑器模式"
-              items={[
-                { value: 'source' as const, label: '源码', icon: 'code', hint: '业务逻辑' },
-                { value: 'viz' as const, label: '可视化代码', icon: 'eye', hint: '运行时执行' },
-              ]}
-              value={editorMode}
-              onChange={(m) => void switchEditorMode(m)}
-            />
-            <IconButton
-              label="保存"
-              disabled={!selected || !dirty}
-              onClick={() => void handleSave()}
-            >
-              <Icon name="save" size={18} />
-            </IconButton>
-            <IconButton label="另存为副本" disabled={!selected} onClick={() => void handleSaveAs()}>
-              <Icon name="save-copy" size={18} />
-            </IconButton>
-            <IconButton
-              label={selected?.favorite ? '取消收藏' : '收藏'}
-              disabled={!selected}
-              aria-pressed={Boolean(selected?.favorite)}
-              onClick={() => void handleToggleFavorite()}
-            >
-              <Icon name={selected?.favorite ? 'star-filled' : 'star'} size={18} />
-            </IconButton>
-            <IconButton
-              label="AI 问答"
-              disabled={!selected}
-              onClick={() => {
-                if (!selected) return
-                setAiAutoAsk(
-                  `请解释算法「${selected.title}」的思路、时间/空间复杂度，并指出可改进点。`,
-                )
-                setAiOpen(true)
+          <div className="algo-lab__editor-head">
+            <input
+              className="algo-title-input"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                setDirty(true)
               }}
-            >
-              <Icon name="message" size={18} />
-            </IconButton>
-            <IconButton
-              label="生成可视化代码"
-              busy={converting}
-              disabled={!selected || converting}
-              onClick={() => void silentVisualize()}
-            >
-              <Icon name="wand" size={18} />
-            </IconButton>
+              placeholder="算法标题"
+              disabled={!selected}
+            />
+            <div className="algo-lab__editor-actions">
+              <span className="algo-lab__hint">{dirty ? '未保存' : '已保存'}</span>
+              <SelectMenu
+                ariaLabel="编辑器模式"
+                items={[
+                  { value: 'source' as const, label: '源码', icon: 'code', hint: '业务逻辑' },
+                  { value: 'viz' as const, label: '可视化代码', icon: 'eye', hint: '运行时执行' },
+                ]}
+                value={editorMode}
+                onChange={(m) => void switchEditorMode(m)}
+              />
+              <IconButton
+                label="保存"
+                disabled={!selected || !dirty}
+                onClick={() => void handleSave()}
+              >
+                <Icon name="save" size={18} />
+              </IconButton>
+              <IconButton label="另存为副本" disabled={!selected} onClick={() => void handleSaveAs()}>
+                <Icon name="save-copy" size={18} />
+              </IconButton>
+              <IconButton
+                label={selected?.favorite ? '取消收藏' : '收藏'}
+                disabled={!selected}
+                aria-pressed={Boolean(selected?.favorite)}
+                onClick={() => void handleToggleFavorite()}
+              >
+                <Icon name={selected?.favorite ? 'star-filled' : 'star'} size={18} />
+              </IconButton>
+              <IconButton
+                label="AI 问答"
+                disabled={!selected}
+                onClick={() => {
+                  if (!selected) return
+                  setAiAutoAsk(
+                    `请解释算法「${selected.title}」的思路、时间/空间复杂度，并指出可改进点。`,
+                  )
+                  setAiOpen(true)
+                }}
+              >
+                <Icon name="message" size={18} />
+              </IconButton>
+              <IconButton
+                label="生成可视化代码"
+                busy={converting}
+                disabled={!selected || converting}
+                onClick={() => void silentVisualize()}
+              >
+                <Icon name="wand" size={18} />
+              </IconButton>
+            </div>
           </div>
-        </div>
-        <div className="algo-lab__mode-bar">
-          <span className="algo-lab__hint">
-            {playing || cursor > 0
-              ? selected?.sourceCode && selected.sourceCode !== (selected.vizCode ?? '')
-                ? '回放中：编辑器显示源码，高亮行来自 delay(源码行号)'
+          <div className="algo-lab__mode-bar">
+            <span className="algo-lab__hint">
+              {playing || cursor > 0
+                ? selected?.sourceCode && selected.sourceCode !== (selected.vizCode ?? '')
+                  ? '回放中：编辑器显示源码，高亮行来自 delay(源码行号)'
+                  : editorMode === 'source'
+                    ? '编辑源码；运行时执行已保存的可视化代码'
+                    : '可视化代码将直接用于运行'
                 : editorMode === 'source'
                   ? '编辑源码；运行时执行已保存的可视化代码'
-                  : '可视化代码将直接用于运行'
-              : editorMode === 'source'
-                ? '编辑源码；运行时执行已保存的可视化代码'
-                : '可视化代码将直接用于运行'}
-          </span>
-        </div>
-        <div style={{ padding: '0 12px 8px' }}>
-          <Disclosure label="元信息" defaultOpen={false}>
-            <label className="algo-field">
-              <span>描述</span>
-              <input
-                value={desc}
-                onChange={(e) => {
-                  setDesc(e.target.value)
-                  setDirty(true)
-                }}
-                disabled={!selected}
-              />
-            </label>
-            <label className="algo-field">
-              <span>分类</span>
-              <input
-                value={selected?.category ?? ''}
-                onChange={(e) => {
-                  void persistSelected({ category: e.target.value || '其他' })
-                }}
-                disabled={!selected || selected.source === 'builtin'}
-                title={selected?.source === 'builtin' ? '内置算法请先「另存为」再改分类' : undefined}
-              />
-            </label>
-            <label className="algo-field">
-              <span>标签（逗号分隔）</span>
-              <input
-                value={(selected?.tags ?? []).join(', ')}
-                onChange={(e) => {
-                  const tags = e.target.value
-                    .split(/[,，]/)
-                    .map((s) => s.trim())
-                    .filter(Boolean)
-                  void persistSelected({ tags })
-                }}
-                disabled={!selected || selected.source === 'builtin'}
-              />
-            </label>
-          </Disclosure>
-        </div>
-        <div className="algo-lab__editor-body">
-          <CodeEditor
-            value={(() => {
-              const src = selected?.sourceCode
-              const viz = selected?.vizCode
-              const inPlayback = playing || cursor > 0
-              if (inPlayback && src && src.trim() && src !== viz) return src
-              return code
-            })()}
-            onChange={(v) => {
-              if (playing) return
-              setCode(v)
-              setDirty(true)
-            }}
-            activeLine={activeLine}
-            language={selected?.language ?? lang}
-          />
-        </div>
-        {error ? (
-          <div className="algo-lab__error" role="alert">
-            {error}
+                  : '可视化代码将直接用于运行'}
+            </span>
           </div>
-        ) : null}
-      </section>
+          <div style={{ padding: '0 12px 8px' }}>
+            <Disclosure label="元信息" defaultOpen={false}>
+              <label className="algo-field">
+                <span>描述</span>
+                <input
+                  value={desc}
+                  onChange={(e) => {
+                    setDesc(e.target.value)
+                    setDirty(true)
+                  }}
+                  disabled={!selected}
+                />
+              </label>
+              <label className="algo-field">
+                <span>分类</span>
+                <input
+                  value={selected?.category ?? ''}
+                  onChange={(e) => {
+                    void persistSelected({ category: e.target.value || '其他' })
+                  }}
+                  disabled={!selected || selected.source === 'builtin'}
+                  title={selected?.source === 'builtin' ? '内置算法请先「另存为」再改分类' : undefined}
+                />
+              </label>
+              <label className="algo-field">
+                <span>标签（逗号分隔）</span>
+                <input
+                  value={(selected?.tags ?? []).join(', ')}
+                  onChange={(e) => {
+                    const tags = e.target.value
+                      .split(/[,，]/)
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                    void persistSelected({ tags })
+                  }}
+                  disabled={!selected || selected.source === 'builtin'}
+                />
+              </label>
+            </Disclosure>
+          </div>
+          <div className="algo-lab__editor-body">
+            <CodeEditor
+              value={(() => {
+                const src = selected?.sourceCode
+                const viz = selected?.vizCode
+                const inPlayback = playing || cursor > 0
+                if (inPlayback && src && src.trim() && src !== viz) return src
+                return code
+              })()}
+              onChange={(v) => {
+                if (playing) return
+                setCode(v)
+                setDirty(true)
+              }}
+              activeLine={activeLine}
+              language={selected?.language ?? lang}
+            />
+          </div>
+          {error ? (
+            <div className="algo-lab__error" role="alert">
+              {error}
+            </div>
+          ) : null}
+          <div className="panel-foot">
+            <span>回放时自动高亮当前执行行 · 空格播放/暂停 · ←/→ 步进 · R 运行</span>
+            <span className="panel-foot__lang">{langLabel}</span>
+          </div>
+        </section>
+      )}
+      </div>
 
-      <nav className="algo-lab__mobile-tabs" aria-label="移动端面板切换">
-        <button
-          type="button"
-          className={`algo-lab__mobile-tab${mobileTab === 'library' ? ' is-active' : ''}`}
-          onClick={() => setMobileTab('library')}
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="3" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-            <rect x="14" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-            <rect x="3" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-            <rect x="14" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-          </svg>
-          算法库
-        </button>
-        <button
-          type="button"
-          className={`algo-lab__mobile-tab${mobileTab === 'viz' ? ' is-active' : ''}`}
-          onClick={() => setMobileTab('viz')}
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-            <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" opacity="0.5" />
-          </svg>
-          可视化
-        </button>
-        <button
-          type="button"
-          className={`algo-lab__mobile-tab${mobileTab === 'code' ? ' is-active' : ''}`}
-          onClick={() => setMobileTab('code')}
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M8 6l-5 6 5 6M16 6l5 6-5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          代码
-        </button>
-      </nav>
+      <footer className="algo-lab__statusbar">
+        <span className="algo-lab__status-side">
+          <i
+            className={`algo-lab__status-dot${error ? ' is-error' : building ? ' is-busy' : ''}`}
+            aria-hidden="true"
+          />
+          {error ? '运行出错' : building ? '构建中…' : '就绪'} · {langLabel} · tracers{' '}
+          {tracers.length > 0 ? '已连接' : '待运行'}
+        </span>
+        <span className="algo-lab__status-side">
+          步 {Math.min(cursor, total)}/{total}
+          {activeLine != null ? ` · 行 ${activeLine}` : ''} · UTF-8
+        </span>
+      </footer>
 
       {toast ? (
         <div className="algo-toast" role="status">

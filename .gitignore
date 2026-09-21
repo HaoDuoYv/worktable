@@ -86,3 +86,9 @@ vendor/
 generated-*.png
 
 server.tar
+.workbuddy/
+.superpowers/
+
+# Local QA / verification artifacts
+verify-result.json
+_git_*.txt
