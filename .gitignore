@@ -92,3 +92,4 @@ server.tar
 # Local QA / verification artifacts
 verify-result.json
 _git_*.txt
+release-new/
