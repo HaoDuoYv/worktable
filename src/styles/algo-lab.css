@@ -638,6 +638,92 @@
   font-weight: 600;
 }
 
+/* —— 柱状图（数值数组：柱高 = 元素大小） —— */
+.viz-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 16px;
+  min-height: 256px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.viz-bar-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.viz-bar__val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1;
+  transition: color var(--dur-fast) var(--ease-ui);
+}
+
+.viz-bar {
+  width: 44px;
+  min-width: 20px;
+  background: linear-gradient(180deg, var(--ink-700) 0%, var(--ink-800) 100%);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px 6px 0 0;
+  transition:
+    height var(--dur-mid) var(--ease-ui),
+    background-color var(--dur-fast) var(--ease-ui),
+    border-color var(--dur-fast) var(--ease-ui),
+    transform var(--dur-fast) var(--ease-ui);
+}
+
+.viz-bar.is-selected {
+  background: color-mix(in srgb, var(--accent) 26%, var(--ink-700));
+  border-color: var(--accent);
+  transform: translateY(-3px);
+  animation:
+    viz-op-search 700ms var(--ease-ui),
+    viz-pulse-select 380ms var(--ease-ui);
+}
+
+.viz-bar-wrap:has(.viz-bar.is-selected) .viz-bar__val,
+.viz-bar-wrap:has(.viz-bar.is-selected) .viz-bar__idx {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.viz-bar.is-patched {
+  background: color-mix(in srgb, var(--signal) 30%, var(--ink-700));
+  border-color: var(--signal);
+  animation:
+    viz-op-insert 240ms var(--ease-ui),
+    viz-flash-patch 520ms var(--ease-ui);
+}
+
+.viz-bar-wrap:has(.viz-bar.is-patched) .viz-bar__val {
+  color: var(--signal);
+}
+
+.viz-bar__idx {
+  font-size: 10px;
+  color: var(--text-subtle);
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+@media (max-width: 600px) {
+  .viz-bar {
+    width: 30px;
+  }
+
+  .viz-bars {
+    gap: 6px;
+    padding: 12px;
+  }
+}
+
 /* Stack / Queue / LinkedList */
 .viz-stack {
   display: flex;

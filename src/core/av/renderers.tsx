@@ -1,10 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
-import type { TracerViewState } from '@/core/av/types'
+import type { CellState, TracerViewState } from '@/core/av/types'
 
 function cellClass(cell: { patched: boolean; selected: boolean }): string {
   if (cell.patched) return 'viz-cell is-patched'
   if (cell.selected) return 'viz-cell is-selected'
   return 'viz-cell'
+}
+
+function barClass(cell: CellState): string {
+  if (cell.patched) return 'viz-bar is-patched'
+  if (cell.selected) return 'viz-bar is-selected'
+  return 'viz-bar'
+}
+
+/** 柱体可用最大高度（px），柱高 = 值 / 最大值 × 该值 */
+const BAR_MAX_H = 200
+/** 柱体最小高度（px），保证 0 值与极小值可见 */
+const BAR_MIN_H = 4
+
+/** 数值数组 → 柱状图：柱子高度与元素大小成正比，排序即柱子交换/归位。 */
+function BarChartView({ title, row }: { title: string; row: CellState[] }) {
+  const max = Math.max(...row.map((c) => Math.max(1, Math.abs(Number(c.value) || 0) || 1)))
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{title}</div>
+      <div className="viz-bars">
+        {row.map((cell, i) => {
+          const v = Number(cell.value) || 0
+          const h = Math.max(BAR_MIN_H, (Math.abs(v) / max) * BAR_MAX_H)
+          return (
+            <div key={i} className="viz-bar-wrap" title={`索引 ${i} · 值 ${fmt(cell.value)}`}>
+              <span className="viz-bar__val">{fmt(cell.value)}</span>
+              <div className={barClass(cell)} style={{ height: `${Math.round(h)}px` }} />
+              <span className="viz-bar__idx">{i}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function fmt(value: unknown): string {
@@ -14,6 +48,12 @@ function fmt(value: unknown): string {
 
 export function Array1DView({ state }: { state: TracerViewState }) {
   const row = state.array?.[0] ?? []
+  // 全数值数组 → 柱状图（柱高 ∝ 值大小），否则回退单元格表示
+  const numeric =
+    row.length > 0 &&
+    row.every((c) => typeof c.value === 'number' && Number.isFinite(c.value as number))
+  if (numeric) return <BarChartView title={state.title} row={row} />
+
   return (
     <div className="viz-panel">
       <div className="viz-panel__title">{state.title}</div>

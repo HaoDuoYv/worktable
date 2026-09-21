@@ -51,7 +51,11 @@ async function main() {
   await page.waitForTimeout(300)
   await page.getByRole('button', { name: '运行', exact: true }).click()
   await page.waitForTimeout(3000)
-  check('运行后画布出现可视化单元', (await page.locator('.viz-cell').count()) > 0)
+  check('运行后画布出现可视化单元', (await page.locator('.viz-bar, .viz-cell').count()) > 0)
+  check(
+    '数值数组渲染为柱状图（柱高=元素大小）',
+    (await page.locator('.algo-lab__canvas .viz-bar').count()) > 0,
+  )
   check('画布包含非日志可视化面板', (await page.locator('.algo-lab__canvas .viz-panel').count()) > 0)
   check('日志区出现日志文本', (await page.locator('.viz-logsec__body pre.viz-log').count()) > 0)
   check('步数胶囊出现', await page.locator('.viz-step-badge').isVisible())
