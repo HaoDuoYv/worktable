@@ -84,7 +84,9 @@ const {
 
 **LogTracer**
 
-- `set(log?)` / `print(msg)` / `println(msg)`  
+- `set(log?)` / `print(msg)` / `println(msg)`
+- **变量观察**：界面上方「变量条」会从日志中解析 `name = value`（如 `i=3`、`A[0]=5`）。
+  生成/编写可视化代码时，关键变量请用 `println` 输出 `标识符=值` 形式，便于步骤回放时观察。
 
 **GraphTracer / TreeTracer**
 

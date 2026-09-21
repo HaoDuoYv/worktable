@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { TracerViewState } from '@/core/av/types'
 
 function cellClass(cell: { patched: boolean; selected: boolean }): string {
@@ -327,6 +328,62 @@ export function TracerPanel({ state }: { state: TracerViewState }) {
     <div className="viz-panel">
       <div className="viz-panel__title">{state.title || state.kind}</div>
       <p className="viz-empty">暂不支持的 Tracer 类型：{state.kind}</p>
+    </div>
+  )
+}
+
+/** Parses log text for `var = value` patterns and renders them as live chips. */
+export function VariableInspector({ tracers }: { tracers: TracerViewState[] }) {
+  const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set())
+  const prevValues = useRef<Map<string, string>>(new Map())
+
+  // Extract variable assignments from all log tracers
+  const vars = new Map<string, string>()
+  for (const t of tracers) {
+    if (!t.log) continue
+    const lines = t.log.split('\n')
+    for (const line of lines) {
+      const regex = /([a-zA-Z_]\w*(?:\[[^\]]+\])?)\s*=\s*([^\n,;]{1,40})/g
+      let m: RegExpExecArray | null
+      while ((m = regex.exec(line)) !== null) {
+        const name = m[1].trim()
+        const value = m[2].trim()
+        vars.set(name, value)
+      }
+    }
+  }
+
+  // Detect which variables changed since last render
+  useEffect(() => {
+    const changed = new Set<string>()
+    for (const [name, value] of vars) {
+      const prev = prevValues.current.get(name)
+      if (prev !== undefined && prev !== value) {
+        changed.add(name)
+      }
+      prevValues.current.set(name, value)
+    }
+    setChangedKeys(changed)
+    // Clear changed state after animation
+    const timer = window.setTimeout(() => setChangedKeys(new Set()), 500)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracers])
+
+  if (vars.size === 0) return null
+
+  return (
+    <div className="var-inspector" role="region" aria-label="变量观察">
+      {[...vars.entries()].slice(-12).map(([name, value]) => (
+        <span
+          key={name}
+          className={`var-chip${changedKeys.has(name) ? ' is-changed' : ''}`}
+        >
+          <span className="var-chip__name">{name}</span>
+          <span className="var-chip__eq">=</span>
+          <span className="var-chip__val">{value}</span>
+        </span>
+      ))}
     </div>
   )
 }

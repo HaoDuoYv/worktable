@@ -173,6 +173,7 @@ export function buildAlgoSystemPrompt(): string {
     '静态链表：StaticLinkedList init/setData/setNext 或 set(data,next)。',
     '可视化步骤对齐源码：Tracer.delay(N) 中的 N 必须是【源码 sourceCode】的 0-based 行号（不是可视化代码行号）。',
     '每个关键逻辑步骤后调用 delay(对应源码行号)，便于播放时高亮源码。',
+    '日志变量观察：关键变量请用 LogTracer 打印为「标识符=值」（如 i=2、A[0]=5），供界面变量条解析。',
     '- 至少创建 1 个 Tracer',
     '- 必须 Layout.setRoot（Python 可用 set_root；C++ 必须 Layout::setRoot，禁止 Layout.setRoot）',
     '- 必须至少 1 次 Tracer.delay()（C++ 为 Tracer::delay）',

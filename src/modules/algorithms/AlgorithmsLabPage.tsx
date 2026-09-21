@@ -8,7 +8,7 @@ import { Icon } from '@/components/Icon'
 import { SelectMenu } from '@/components/SelectMenu'
 import { Disclosure } from '@/components/Disclosure'
 import { AvEngine } from '@/core/av/engine'
-import { TracerPanel } from '@/core/av/renderers'
+import { TracerPanel, VariableInspector } from '@/core/av/renderers'
 import type { AvCommand } from '@/core/av/types'
 import { runJsAlgorithm } from '@/core/runners/js'
 import { runPythonAlgorithm } from '@/core/runners/python'
@@ -77,6 +77,7 @@ export function AlgorithmsLabPage() {
   const [aiOpen, setAiOpen] = useState(false)
   const [aiAutoAsk, setAiAutoAsk] = useState<string | undefined>(undefined)
   const [converting, setConverting] = useState(false)
+  const [mobileTab, setMobileTab] = useState<'library' | 'viz' | 'code'>('viz')
 
   const [building, setBuilding] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -532,7 +533,7 @@ export function AlgorithmsLabPage() {
   }, [applyCursor, run, stopPlay])
 
   return (
-    <div className={`algo-lab${aiOpen ? ' has-inline-ai' : ''}`}>
+    <div className={`algo-lab${aiOpen ? ' has-inline-ai' : ''}`} data-mobile-tab={mobileTab}>
       <aside className="algo-lab__nav">
         <div className="algo-lab__nav-head">
           <div className="algo-lab__nav-title">算法库</div>
@@ -703,7 +704,19 @@ export function AlgorithmsLabPage() {
             <h2 className="algo-lab__viz-title">可视化</h2>
             <p className="algo-lab__viz-desc">{selected?.description ?? '选择或新建算法'}</p>
           </div>
+          <div className="viz-step-info">
+            {total > 0 && (
+              <span className="viz-step-badge">
+                <span className="viz-step-badge__dot" aria-hidden="true" />
+                {Math.min(cursor, total)} / {total}
+              </span>
+            )}
+            {activeLine != null && (
+              <span className="viz-step-line">行 {activeLine}</span>
+            )}
+          </div>
         </div>
+        {tracers.length > 0 && <VariableInspector tracers={tracers} />}
         <div className="algo-lab__canvas">
           {tracers.length === 0 ? (
             <div className="viz-placeholder">
@@ -879,6 +892,43 @@ export function AlgorithmsLabPage() {
           </div>
         ) : null}
       </section>
+
+      <nav className="algo-lab__mobile-tabs" aria-label="移动端面板切换">
+        <button
+          type="button"
+          className={`algo-lab__mobile-tab${mobileTab === 'library' ? ' is-active' : ''}`}
+          onClick={() => setMobileTab('library')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="14" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="3" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="14" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+          算法库
+        </button>
+        <button
+          type="button"
+          className={`algo-lab__mobile-tab${mobileTab === 'viz' ? ' is-active' : ''}`}
+          onClick={() => setMobileTab('viz')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+            <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" opacity="0.5" />
+          </svg>
+          可视化
+        </button>
+        <button
+          type="button"
+          className={`algo-lab__mobile-tab${mobileTab === 'code' ? ' is-active' : ''}`}
+          onClick={() => setMobileTab('code')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M8 6l-5 6 5 6M16 6l5 6-5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          代码
+        </button>
+      </nav>
 
       {toast ? (
         <div className="algo-toast" role="status">
