@@ -1885,3 +1885,286 @@ li.is-pending-delete .algo-item {
     right: auto !important;
   }
 }
+
+/* ============================================================
+   数据结构可视化 —— 统计信息浮动窗口 + 操作动画
+   ============================================================ */
+
+.algo-lab__viz {
+  position: relative;
+}
+
+.viz-stats {
+  position: absolute;
+  top: 42%;
+  right: 12px;
+  transform: translateY(-50%);
+  z-index: 30;
+  width: min(240px, calc(100% - 24px));
+  background: color-mix(in srgb, var(--elevated) 92%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+  font-size: 12px;
+  transition: box-shadow var(--dur-fast) var(--ease-ui);
+}
+
+/* 拖动后改用自由坐标，解除默认垂直居中位移 */
+.viz-stats.is-dragged {
+  transform: none;
+}
+
+.viz-stats.is-flash {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.viz-stats.is-min {
+  width: auto;
+}
+
+.viz-stats__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.viz-stats__head:active {
+  cursor: grabbing;
+}
+
+.viz-stats__grip {
+  color: var(--text-subtle);
+  display: grid;
+  place-items: center;
+  line-height: 0;
+  flex: none;
+}
+
+.viz-stats__title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.viz-stats__status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.viz-stats__status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-subtle);
+  flex: none;
+}
+
+.viz-stats__status.is-busy .viz-stats__status-dot,
+.viz-stats__status.is-running .viz-stats__status-dot {
+  background: var(--signal);
+  animation: step-dot-pulse 1s ease-in-out infinite;
+}
+
+.viz-stats__status.is-done .viz-stats__status-dot {
+  background: var(--signal);
+}
+
+.viz-stats__status.is-paused .viz-stats__status-dot {
+  background: var(--warn);
+}
+
+.viz-stats__toggle {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1;
+  flex: none;
+}
+
+.viz-stats__toggle:hover {
+  background: var(--ink-700);
+  color: var(--text);
+}
+
+.viz-stats__body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.viz-stats__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.viz-stats__k {
+  color: var(--text-muted);
+}
+
+.viz-stats__v {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-stats__v[data-metric='count'] {
+  color: var(--accent);
+}
+
+.viz-stats__v[data-metric='capacity'] {
+  color: var(--signal);
+}
+
+.viz-stats__v[data-metric='opTotal'] {
+  color: var(--warn);
+}
+
+.viz-stats__ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+
+.viz-stats__op {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-subtle);
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.viz-stats__ops-empty {
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+/* —— 数据结构操作动画（仅 transform / opacity，GPU 加速） —— */
+
+@keyframes viz-op-insert {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes viz-op-delete {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes viz-op-search {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
+@keyframes viz-op-traverse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 单元格：写入/交换（插入态）—— 弹入 */
+.viz-cell.is-patched {
+  animation:
+    viz-op-insert 240ms var(--ease-ui),
+    viz-flash-patch 520ms var(--ease-ui);
+}
+
+/* 单元格：选中（查找/比较）—— 扫描高亮 */
+.viz-cell.is-selected {
+  animation:
+    viz-op-search 700ms var(--ease-ui),
+    viz-pulse-select 380ms var(--ease-ui);
+}
+
+/* 图/树节点：访问/选中（遍历）—— 涟漪 */
+.viz-node.is-visited circle,
+.viz-node.is-selected circle {
+  animation: viz-op-traverse 360ms var(--ease-ui);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.viz-edge.is-visited,
+.viz-edge.is-selected {
+  transition: stroke var(--dur-fast) var(--ease-ui);
+}
+
+/* 移动端：统计窗口收拢为贴顶的紧凑横条 */
+@media (max-width: 600px) {
+  .viz-stats,
+  .viz-stats.is-dragged {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    transform: none;
+  }
+
+  .viz-stats__body {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+
+  .viz-stats__row .viz-stats__k {
+    color: var(--text-subtle);
+  }
+
+  .viz-stats__ops {
+    border-top: 0;
+    padding-top: 0;
+    width: 100%;
+  }
+}

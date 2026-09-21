@@ -9,6 +9,7 @@ import { SelectMenu } from '@/components/SelectMenu'
 import { Disclosure } from '@/components/Disclosure'
 import { Switch } from '@/components/Switch'
 import { ResizeHandle, usePersistedWidth } from '@/components/Resizable'
+import { VizStatsPanel } from '@/components/VizStatsPanel'
 import { AvEngine } from '@/core/av/engine'
 import { TracerPanel, VariableInspector } from '@/core/av/renderers'
 import type { AvCommand } from '@/core/av/types'
@@ -988,6 +989,16 @@ export function AlgorithmsLabPage() {
             </div>
           )}
         </div>
+
+        {tracers.length > 0 && (
+          <VizStatsPanel
+            tracers={tracers}
+            cursor={cursor}
+            total={total}
+            playing={playing}
+            building={building}
+          />
+        )}
 
         <div className="viz-logsec">
           <div className="viz-logsec__bar">
