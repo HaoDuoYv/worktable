@@ -1,7 +1,9 @@
 # Worktable 可视化代码规范（VIS_SPEC）
 
-> 版本：v1.3 · 对齐 `src/core/av/` 命令回放引擎  
+> 版本：v1.4 · 对齐 `src/core/av/` 命令回放引擎  
 > AI 生成 / 人工编写可视化代码，**必须**满足本规范；转换后由 `validateVizCode` 静态校验。
+>
+> **配套文档**：`docs/VIS_ANIMATION_SPEC.md`（动效语义 + 统计窗口规范）。本文件规定「命令协议与代码写法」，动效层规定「这些命令在画布上如何被动画呈现」。
 
 ---
 
@@ -14,6 +16,17 @@
 | C++ | 本地 `server-cpp` | `#include "av.h"`，`av::` 命名空间 |
 
 可视化代码 = **业务逻辑 + tracer 调用 + delay 节拍**，运行后产出命令数组，由前端回放。
+
+### 1.1 生成侧契约（AI 必须同时满足）
+
+代码不仅要「能跑」，还要「跑出来好看、信息完整」。生成时必须同时满足 4 条渲染契约：
+
+| # | 契约 | 为什么 | 详见 |
+|---|------|--------|------|
+| C1 | 数值数组用 `Array1DTracer.set(纯数字数组)` | 界面自动渲染为**柱状图**，柱高 ∝ 元素大小；含 `null`/字符串会退化为等大单元格，排序类动画直接失效 | §3.3 · §3.6 |
+| C2 | 数据操作的关键分支用 `println` 输出**中文操作词** | 统计窗口从日志关键词计数，无日志则操作次数恒为 0 | §3.4 · §3.7 |
+| C3 | 关键变量用 `println('name=value')` | 日志会被解析成画布上方「变量条」chips，便于观察 | §3.5 |
+| C4 | 每个语义步进处 `delay()`，且 delay 落在对应源码行 | 回放分步 + 源码行高亮；缺 delay 无法回放 | §2 · §3.2 |
 
 ---
 
@@ -33,14 +46,40 @@
 | `VerticalLayout` / `HorizontalLayout` | 布局容器 |
 | `setRoot` | 设置根视图（key 可为 tracer 或 layout） |
 | `set` / `patch` / `depatch` | 数据 |
+| `init` | 初始化容量（环形队列） |
 | `push` / `pop` / `enqueue` / `dequeue` / `unshift` / `shift` | 栈/队列/链表 |
+| `pushFront` / `popFront` / `pushBack` / `popBack` | 双端队列 |
+| `setData` / `setNext` | 静态链表 |
 | `select` / `deselect` / `selectRow`… | 高亮 |
 | `print` / `println` | 日志 |
 | `visit` / `leave` | 图/树遍历 |
-| `rotateLeft` / `rotateRight` / `split` / `setPointer` | 红黑树 / B+ 树 |
+| `rotateLeft` / `rotateRight` / `split` / `setPointer` / `setColor` / `setLabel` | 红黑树 / B+ 树 |
 | `delay` | **必须**：步进点；**N=源码 0-based 行号**（用于回放高亮源码） |
 
 **没有 `delay` 则无法分步回放。**
+
+### 2.1 TracerKind 与渲染器映射
+
+引擎按 tracer 的 `kind` 分派渲染器（`src/core/av/renderers.tsx`）。**`kind` 与 Tracer 类名完全同名**（定义见 `src/core/av/types.ts` 的 `TracerKind`）。生成代码时按目标结构选对 Tracer 类即可，无需关心渲染实现：
+
+| Tracer 类 = kind | 画布形态 | 动画语义（详见 VIS_ANIMATION_SPEC §3） |
+|------------------|----------|------------------------------------------|
+| `Array1DTracer` | **数值数组 → 柱状图**；否则等大单元格 | 写入弹入 / 比较扫描 / 交换 |
+| `Array2DTracer` | 二维表格 | 单元格 patch |
+| `LogTracer` | 日志流（不占画布主区） | 逐行追加 |
+| `GraphTracer` | SVG 节点 + 边 | 遍历涟漪 / 访问变色 |
+| `TreeTracer` | SVG 节点 + 有向边 | 插入弹入 / 遍历涟漪 |
+| `StackTracer` | 纵向单元格（top/bottom） | push 顶部弹入 / pop 收缩 |
+| `QueueTracer` | 横向单元格（front/back） | enqueue 右弹入 / dequeue 左收缩 |
+| `LinkedListTracer` | 节点 + `→` 箭头 | 断链重连 / 逐个涟漪 |
+| `CircularQueueTracer` | 环形槽位（H/T 标签） | 槽位弹入 / 标签旋转 |
+| `DequeTracer` | 双端可插入单元格 | 两端弹入 / 收缩 |
+| `RedBlackTreeTracer` | 红/黑着色树 | 旋转位移 / 颜色过渡 |
+| `BPlusTreeTracer` | 内部节点 + 叶层链表 | split 分裂 / 键上浮 |
+| `StaticLinkedListTracer` | `data`/`next` 双行表 | 指针跳转 / 写入闪光 |
+| `unknown`（未注册类名） | 通用兜底视图 | 无 |
+
+> ⚠️ **引擎没有 `BTreeTracer`**——传入未注册类名会落到 `unknown` 兜底视图。B 树请用 `TreeTracer`（或 `GraphTracer`）呈现，节点 label 形如 `"10|20"`。详见 §3.3。
 
 ---
 
@@ -75,6 +114,18 @@ const {
 - `select(sx, ex?)` / `deselect(sx, ex?)`  
 - `patch(x, v?)` / `depatch(x)`  
 
+> **渲染契约（重要）**：`Array1DTracer` 会**自动检测**数组是否为「纯数值数组」——
+> - **是**（每项都是有限 `number`）→ 渲染为**柱状图**，柱高 = `|值| / max(|值|) × 200px`，柱下为索引、柱顶为数值。**排序类算法必须走这条路径**，否则「元素大小」这一核心信息不可见。
+> - **否**（含 `null`、`undefined`、字符串、对象）→ 回退为等大单元格网格。
+>
+> 因此排序 / 查找 / 前缀和 / 堆 等**数值型算法**：
+> - ✅ `arr.set([5, 2, 8, 1])`、`arr.set([3, 1, 2])`
+> - ❌ `arr.set([5, 2, null, 1])`、`arr.set(['a', 'b'])`、`arr.set([{v: 5}])`
+>
+> 若算法需要「空槽」语义（如线性探测哈希），请改用 `Array2DTracer` 或把空槽写作固定哨兵数值（如 `-1`），**不要用 `null`**，否则柱状图不生效。
+>
+> 柱状图下 `select(i)` / `patch(i, v)` 的语义与单元格一致：`select` 使柱体上浮并高亮（蓝 `--accent`），`patch` 使柱体变青（`--signal`）并按新值平滑改变高度（`height` 过渡即排序动画本体）。
+
 **Array2DTracer**
 
 - `set(array2d)`  
@@ -94,6 +145,22 @@ const {
 - `directed(bool)`
 - `visit(target, source?, weight?)` / `leave(...)`
 - `select(target, source?)` / `deselect(...)`
+
+> **B 树的表达方式**：引擎**没有** `BTreeTracer`，B 树以 `TreeTracer`（或 `GraphTracer`）呈现即可。约定：
+> - 一个「多键节点」= 一个树节点，`label` 用 `|` 分隔键，如 `"10|20|30"`；
+> - 节点分裂时，新建节点 + 覆写新旧 label，中间键「上浮」在视觉上表现为 label 变化与边重连（详见 `VIS_ANIMATION_SPEC.md` §3.8）；
+> - 父子边由 `set()` 的邻接矩阵给出，重连后需重新 `set()` 或 `visit` 相关节点以刷新。
+>
+> 若需真正的分裂/上浮动画，请改用 `BPlusTreeTracer`（它自带 `split()`）。
+
+**LogTracer**
+
+- `set(log?)` / `print(msg)` / `println(msg)`
+- **变量观察**：界面上方「变量条」会从日志中解析 `name = value`（如 `i=3`、`A[0]=5`）。
+  生成/编写可视化代码时，关键变量请用 `println` 输出 `标识符=值` 形式，便于步骤回放时观察。
+- **操作计数**：画布上的**统计浮动窗口**同样从日志文本中按关键词计数操作次数——
+  插入、删除、查找、比较、交换、遍历（中/英文均可，见 §3.4 表）。
+  **若日志里没有这些词，统计窗口的「操作次数」将恒为 0。**
 
 **StackTracer（栈，LIFO）**
 
@@ -145,28 +212,115 @@ const {
 - `new VerticalLayout([tracerA, tracerB])`  
 - `new HorizontalLayout([...])`  
 
-### 3.4 示例（合法）
+> **布局建议**：`VerticalLayout` 顺序 = 画布自上而下。常用组合：
+> - `[主结构Tracer, LogTracer]` —— 单画布 + 日志（最常见）；
+> - `[Array1DTracer, Array1DTracer, LogTracer]` —— 双数组对比（如归并、双指针）；
+> - 只放 1 个 Tracer 时日志区退化为画布下方的独立日志面板（引擎自动分流），不会丢失。
+
+---
+
+### 3.4 操作动画语义（生成时必须遵守的映射）
+
+引擎不解析「你做了什么」，只按命令驱动动画。生成代码时，**用哪条命令决定了画布上出现哪种动画**——这是让回放「看得懂」的关键：
+
+| 你的意图 | 应发出的命令序列 | 画布上的动画 |
+|----------|------------------|--------------|
+| 正在比较 / 考察某个元素 | `select(i)` → `delay()` → `deselect(i)` | 该单元/柱体**上浮 + 蓝色扫描高亮**（`viz-op-search`） |
+| 写入 / 交换 / 更新某元素 | `patch(i, v)` → `delay()` | 该单元**青色闪光弹入**（`viz-op-insert` + `viz-flash-patch`）；柱状图下**高度平滑变化**（排序动画本体） |
+| 插入新元素 | `push` / `enqueue` / `unshift` / `set` 后 `delay()` | 新单元**弹入**（`viz-op-insert`，scale 0.5→1.06→1） |
+| 删除元素 | `pop` / `dequeue` / `shift` 后 `delay()` | 被删单元**收缩淡出**（`viz-op-delete`，scale→0.3） |
+| 遍历 / 访问节点 | `visit(id)` → `delay()` → `leave(id)` | 节点**涟漪**（`viz-op-traverse`，scale 1→1.18→1），边标记已访问 |
+| 结构旋转（红黑树） | `rotateLeft(x)` / `rotateRight(x)` → `delay()` | 节点位置 `transform` 平滑过渡 + 边重连淡入 |
+| B+ 分裂 | `split(oldId, newId, promote, …)` → `delay()` | 新叶弹入 + 键上浮到父节点 |
+
+**两条硬约束**：
+
+1. **`delay()` 必须紧跟在语义动作之后**（而不是循环末尾一次性补）。一次 `delay` = 一帧回放，多步动作必须拆成多帧，否则只会看到起点和终点。
+2. **比较 ≠ 写入**。比较用 `select`，写入用 `patch`。若比较时也用 `patch`，画布会把「看一眼」渲染成「改了值」，语义错误。
+
+> 完整的 9 类数据结构逐操作动画规格（含 head/tail 标签移动、指针重连、键上浮等细节）见 **`docs/VIS_ANIMATION_SPEC.md` §3**。
+
+---
+
+### 3.5 日志与统计计数约定（重要）
+
+画布右下角的**统计浮动窗口**（元素数量 / 当前容量 / 操作次数 / 执行状态）由两部分数据驱动：
+
+### 3.5.1 自动统计（无需写日志）
+
+| 指标 | 来源 | 生成侧注意事项 |
+|------|------|----------------|
+| 元素数量 | 对每个非 `LogTracer` 的 tracer 做有效值计数（空值、`null`、`·` 占位不计） | 数组请避免用 `null` 占位；否则既丢柱状图又丢计数 |
+| 当前容量 | 环形队列取 `init(capacity)` 的值；静态链表取 `next` 行长度；其余取数组长度 | 环形队列**必须**先 `init(capacity)`，否则容量显示为数组长度 |
+| 执行状态 | 回放上下文（`cursor` / `total` / `playing` / `building`） | 无需干预，由引擎推导 |
+
+### 3.5.2 操作计数（依赖日志关键词）
+
+**必须在关键操作处 `println` 输出下列中文（或英文）词**，统计窗口才能计数：
+
+| 计数分项 | 命中关键词（中文） | 命中关键词（英文） |
+|----------|-------------------|-------------------|
+| 插入 | 插入 | `push` / `enqueue` / `insert` / `unshift` / `add` / `pushFront` / `pushBack` |
+| 删除 | 删除 | `pop` / `dequeue` / `remove` / `delete` / `shift` / `popFront` / `popBack` |
+| 查找 | 查找 / 搜索 | `search` / `find` |
+| 比较 | 比较 | `compare` |
+| 交换 | 交换 | `swap` |
+| 访问 / 遍历 | 遍历 / 访问 | `visit` / `traverse` |
+
+> 匹配为**子串包含**（大小写不敏感），一行日志命中多个词则各项分别 +1。
+> 实现见 `src/core/av/stats.ts` 的 `countOps()`——**本表与实现必须保持一致**，改关键词同时改两处。
+
+**正确写法示例（冒泡排序节选）**：
+
+```js
+arr.select(j); arr.select(j + 1)
+log.println(`比较 A[${j}]=${A[j]} 与 A[${j + 1}]=${A[j + 1]}`)   // → 比较 +1
+Tracer.delay()
+arr.deselect(j); arr.deselect(j + 1)
+
+if (A[j] > A[j + 1]) {
+  ;[A[j], A[j + 1]] = [A[j + 1], A[j]]
+  arr.patch(j, A[j]); arr.patch(j + 1, A[j + 1])
+  log.println(`交换 A[${j}] 与 A[${j + 1}]`)                     // → 交换 +1
+  Tracer.delay()
+}
+```
+
+**反面示例**：整段算法只在结尾 `log.println('done')` → 统计窗口操作次数恒为 0，画布也无法分步。
+
+### 3.5.3 变量条（独立于统计窗口）
+
+日志中形如 `name=value` 或 `name = value` 的片段会被抽成画布上方**变量 chips**（如 `i=3`、`A[0]=5`、`max=9`）。
+
+- 用 `标识符=值`，**不要**加在句子中间（`当前是 i=3 了` 会被整段吞掉，虽仍可解析但不稳）；
+- 一次步进输出的变量不宜超过 6 个，否则变量条会折行挤压画布；
+- 变量名建议与源码变量名一致，便于对照源码高亮行。
+
+---
+
+### 3.6 示例（合法）
 
 ```js
 const { Array1DTracer, LogTracer, Tracer, Layout, VerticalLayout } = require('algorithm-visualizer')
 
 const arr = new Array1DTracer('数组')
 const log = new LogTracer('日志')
-const A = [3, 1, 2]
+const A = [3, 1, 2]                       // 纯数值数组 → 渲染为柱状图
 
 Layout.setRoot(new VerticalLayout([arr, log]))
 arr.set(A)
+log.println(`max=${Math.max(...A)}`)      // 变量条
 Tracer.delay()
 
 for (let i = 0; i < A.length; i++) {
   arr.select(i)
-  log.println(`i=${i} A[i]=${A[i]}`)
+  log.println(`查找 i=${i} A[i]=${A[i]}`)  // 查找 +1，变量条 i / A[i]
   Tracer.delay()
   arr.deselect(i)
 }
 ```
 
-### 3.5 非法
+### 3.7 非法
 
 | 写法 | 原因 |
 |------|------|
@@ -174,6 +328,8 @@ for (let i = 0; i < A.length; i++) {
 | 无任何 `new *Tracer` | 无可视化 |
 | `require('fs')` 等 | Worker 沙箱不允许 |
 | 仅业务代码无 tracer | 视为源码，不是 viz |
+| `arr.set([3, 1, null])` | 数值数组被 `null` 污染，柱状图失效 + 元素计数偏低 |
+| 全篇仅 1 处 `delay` | 只能回放首尾两帧，等于无动画 |
 
 ---
 
@@ -191,6 +347,13 @@ for (let i = 0; i < A.length; i++) {
 1. 至少 1 个 `XxxTracer(...)`  
 2. `Layout.set_root(...)` 或 `Layout.setRoot(...)`（二者等价）  
 3. 至少 1 处 `Tracer.delay()`（可带行号：`Tracer.delay(12)`；空括号会被注入行号）
+
+> §1.1 生成侧契约 C1–C4 对 Python 同样适用。注意 Python 的 `None` 与 `numpy` 数值须转成原生 `int`/`float` 再 `set()`，否则柱状图检测失败：
+> ```python
+> array1d.set([int(x) for x in A])   # ✅ 纯数值 → 柱状图
+> array1d.set(A_with_none)           # ❌ 含 None → 退化为单元格
+> ```
+> 操作词日志同样用中文或英文关键词（如 `log.println(f"比较 A[{j}] 与 A[{j+1}]")`）。
 
 ### 4.3 示例
 
@@ -240,6 +403,8 @@ using namespace av;
 1. 至少 1 个 `Array1DTracer` / `LogTracer` / …  
 2. `Layout::setRoot(...)`（C++ 用 `::`，不可写 `Layout.setRoot`）  
 3. 至少 1 次 `Tracer::delay(...)`（参数为 0-based 行号，可选）
+
+> §1.1 生成侧契约 C1–C4 对 C++ 同样适用：用 `std::vector<int>` / `std::vector<double>` 传给 `array1d.set()` 才能触发柱状图（不要传 `std::vector<std::string>` 或含 `-1` 哨兵的混合语义数组）；每个语义动作后补 `Tracer::delay(行号)`；关键分支 `log.println("比较 ...")` 输出中文操作词。
 
 ### 5.3 示例
 
@@ -294,8 +459,13 @@ int main() {
 | `has-delay` | 存在 delay 调用 | error |
 | `has-set-root` | 存在 setRoot/set_root | error* |
 | `no-empty-code` | 非仅空白/注释 | error |
+| `delay-density` | delay 数量 ≥ 3（避免「仅首尾两帧」） | warning |
+| `no-null-in-array-set` | `Array1DTracer.set()` 参数中不含 `null` / `None` / `nullptr` | warning |
+| `has-op-log` | 日志中存在操作关键词（插入/删除/查找/比较/交换/遍历 或对应英文） | warning |
 
 \* 若引擎允许无 root 回退，可降为 warning；**当前校验按 error**，保证可预期。
+
+> 后三条为 **v1.4 新增的体验级校验**（warning）：不阻断应用，但在 UI 提示「柱状图可能不生效 / 统计计数可能为 0」，引导用户让 AI 重新生成。落地位置：`src/modules/algorithms/validateViz.ts`。
 
 ### 7.2 语言专有
 
@@ -348,7 +518,32 @@ interface VizValidateResult {
 3. 满足 §3–§7 必选结构  
 4. 不写说明性正文（或正文在 block 外且可忽略）
 
+**另需满足 §1.1 生成侧契约 C1–C4**（否则代码「能跑但不好看」）：
+
+5. **C1 柱状图**：排序 / 查找 / 数值型算法，`Array1DTracer.set()` 必须收到**纯有限数值数组**，不得含 `null` / 字符串 / 对象；
+6. **C4 分步**：每个语义动作后立即 `delay()`，禁止只在结尾 delay 一次；
+7. **C2 计数**：比较 / 交换 / 插入 / 删除 / 遍历的关键分支，用 `println` 输出含对应**中文操作词**的日志（见 §3.5.2 关键词表）；
+8. **C3 变量条**：关键变量用 `println('name=value')` 输出，单步 ≤ 6 个；
+9. **命令语义正确**：比较用 `select`、写入用 `patch`、插入用 `push/enqueue/unshift`、删除用 `pop/dequeue/shift`（见 §3.4）——命令选错会导致动画语义错误。
+
 前端：`extractCodeBlock` → `validateVizCode` → 成功才 `saveAlgorithm`。
+
+### 8.1 提示词模板（推荐直接复用）
+
+```
+你是数据结构可视化代码生成器。基于下面的源码，生成一份 <语言> 可视化代码。
+
+硬性要求：
+1. 只输出一个 ```<lang> 代码块，不要解释。
+2. 至少 1 个 Tracer + Layout.setRoot + 多处 Tracer.delay()。
+3. 数组元素必须用柱状图呈现：Array1DTracer.set() 传入纯数字数组（不得含 null/字符串）。
+4. 每个语义动作后紧跟 Tracer.delay()，不要合并成一个 delay。
+5. 比较/交换/插入/删除/遍历的关键分支，用 println 输出含「比较 / 交换 / 插入 / 删除 / 遍历」字样的中文日志。
+6. 关键变量用 println("name=value") 输出，每步不超过 6 个。
+
+源码：
+<选中函数 / 类 / 完整文件>
+```
 
 ---
 
@@ -360,5 +555,10 @@ interface VizValidateResult {
 | v1.1 | 增加 Tree/Stack/Queue/LinkedList Tracer；C++ `Layout::setRoot`；校验 `cpp-setroot-syntax` |
 | v1.2 | 增加 CircularQueue/Deque/RedBlackTree/BPlusTree/StaticLinkedList Tracer 与 JS 示例 |
 | v1.3 | 红黑树 rotate、B+ split；回放 delay 对齐源码行并高亮 |
+| **v1.4** | ①`Array1DTracer` **数值数组自动渲染为柱状图**（柱高 ∝ 值大小），非数值回退单元格——新增 §3.3 渲染契约；②新增 §2.1 `TracerKind` ↔ 渲染器映射表，明确 **引擎无 `BTreeTracer`**，B 树改用 `TreeTracer` + `"10\|20"` label；③新增 §3.4 操作动画语义映射（命令 → `viz-op-*` 动画）与两条硬约束（delay 紧跟语义动作、比较≠写入）；④新增 §3.5 日志与统计计数约定（统计窗口字段来源 + 操作计数关键词表 + 变量条规则）；⑤新增 §1.1 生成侧契约 C1–C4 与 §8.1 提示词模板 |
 
-修改规范时请同步：`src/modules/algorithms/validateViz.ts` 与本文件。
+修改规范时请同步：
+- `src/modules/algorithms/validateViz.ts`（校验规则）
+- `src/core/av/renderers.tsx`（渲染契约，柱状图检测逻辑）
+- `src/core/av/stats.ts`（统计字段与计数关键词）
+- `docs/VIS_ANIMATION_SPEC.md`（动效与统计窗口视觉规范）
