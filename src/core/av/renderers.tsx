@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import type { CellState, TracerViewState } from '@/core/av/types'
 
 function cellClass(cell: { patched: boolean; selected: boolean }): string {
@@ -189,62 +189,216 @@ export function LinkedListView({ state }: { state: TracerViewState }) {
 export function GraphView({ state }: { state: TracerViewState }) {
   const nodes = state.nodes ?? []
   const edges = state.edges ?? []
-  const size = 280
+  const isWeighted = Boolean(state.isWeighted)
+  const size = 360
   const c = size / 2
+  const nodeR = 14
+  const arrowGap = 6
   const nodePos = new Map(nodes.map((n) => [n.id, { x: c + n.x, y: c + n.y }]))
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
+
+  const onWheel = (e: ReactWheelEvent<SVGSVGElement>) => {
+    e.preventDefault()
+    const next = e.deltaY > 0 ? zoom / 1.1 : zoom * 1.1
+    setZoom(Math.max(0.4, Math.min(2.5, next)))
+  }
 
   return (
     <div className="viz-panel">
-      <div className="viz-panel__title">{state.title}</div>
-      <svg width={size} height={size} className="viz-graph" role="img" aria-label="图可视化">
+      <div className="viz-panel__title">
+        {state.title}
+        {isWeighted ? <span className="viz-panel__meta">weighted</span> : null}
+        {state.layout ? <span className="viz-panel__meta">layout:{state.layout}</span> : null}
+      </div>
+      <svg
+        width="100%"
+        height={size}
+        viewBox={`${c - size / 2} ${c - size / 2} ${size} ${size}`}
+        className="viz-graph is-pannable"
+        role="img"
+        aria-label="图可视化"
+        onWheel={onWheel}
+        onPointerDown={(e: ReactPointerEvent<SVGSVGElement>) => {
+          ;(e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId)
+          dragRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
+        }}
+        onPointerMove={(e: ReactPointerEvent<SVGSVGElement>) => {
+          const d = dragRef.current
+          if (!d) return
+          setPan({ x: d.panX + (e.clientX - d.x), y: d.panY + (e.clientY - d.y) })
+        }}
+        onPointerUp={() => {
+          dragRef.current = null
+        }}
+        onPointerCancel={() => {
+          dragRef.current = null
+        }}
+      >
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
-            <path d="M0,0 L8,3 L0,6 z" fill="#5a6a80" />
+            <path d="M0,0 L8,3 L0,6 z" fill="currentColor" className="viz-arrow" />
+          </marker>
+          <marker id="arrow-sel" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 z" className="viz-arrow is-selected" />
+          </marker>
+          <marker id="arrow-vis" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 z" className="viz-arrow is-visited" />
           </marker>
         </defs>
-        {edges.map((e, i) => {
-          const a = nodePos.get(e.source)
-          const b = nodePos.get(e.target)
-          if (!a || !b) return null
-          const cls =
-            e.selectedCount > 0
-              ? 'viz-edge is-selected'
-              : e.visitedCount > 0
-                ? 'viz-edge is-visited'
-                : 'viz-edge'
+        <g transform={`translate(${c + pan.x},${c + pan.y}) scale(${zoom}) translate(${-c},${-c})`}>
+          {edges.map((e, i) => {
+            const a = nodePos.get(e.source)
+            const b = nodePos.get(e.target)
+            if (!a || !b) return null
+            let ex = b.x
+            let ey = b.y
+            const dx = b.x - a.x
+            const dy = b.y - a.y
+            const len = Math.hypot(dx, dy) || 1
+            if (state.isDirected !== false) {
+              ex = a.x + (dx / len) * (len - nodeR - arrowGap)
+              ey = a.y + (dy / len) * (len - nodeR - arrowGap)
+            }
+            const cls =
+              e.selectedCount > 0
+                ? 'viz-edge is-selected'
+                : e.visitedCount > 0
+                  ? 'viz-edge is-visited'
+                  : 'viz-edge'
+            const marker =
+              e.selectedCount > 0
+                ? 'url(#arrow-sel)'
+                : e.visitedCount > 0
+                  ? 'url(#arrow-vis)'
+                  : state.isDirected !== false
+                    ? 'url(#arrow)'
+                    : undefined
+            const mx = (a.x + ex) / 2
+            const my = (a.y + ey) / 2
+            return (
+              <g key={i}>
+                <line
+                  x1={a.x}
+                  y1={a.y}
+                  x2={ex}
+                  y2={ey}
+                  className={cls}
+                  markerEnd={marker}
+                />
+                {isWeighted && e.weight != null ? (
+                  <text x={mx} y={my - 6} className="viz-edge__weight" textAnchor="middle">
+                    {String(e.weight)}
+                  </text>
+                ) : null}
+              </g>
+            )
+          })}
+          {nodes.map((n) => {
+            const p = nodePos.get(n.id)
+            if (!p) return null
+            const colorCls = n.color === 'red' ? ' is-red' : n.color === 'black' ? ' is-black' : ''
+            const cls =
+              n.selectedCount > 0
+                ? `viz-node is-selected${colorCls}`
+                : n.visitedCount > 0
+                  ? `viz-node is-visited${colorCls}`
+                  : `viz-node${colorCls}`
+            const label = n.label ?? String(n.id)
+            return (
+              <g key={n.id} transform={`translate(${p.x},${p.y})`} className={cls}>
+                <circle r={nodeR} className="viz-node__circle" />
+                <text textAnchor="middle" dominantBaseline="central" className="viz-node__label">
+                  {label}
+                </text>
+                {isWeighted && n.weight != null && n.label == null ? (
+                  <text x={nodeR + 4} className="viz-node__weight" dominantBaseline="central">
+                    {String(n.weight)}
+                  </text>
+                ) : null}
+              </g>
+            )
+          })}
+        </g>
+      </svg>
+    </div>
+  )
+}
+
+/** AV ChartTracer / numeric Array1D — bar chart by element size. */
+export function ChartView({ state }: { state: TracerViewState }) {
+  const row = state.array?.[0] ?? []
+  return <BarChartView title={state.title || 'Chart'} row={row} />
+}
+
+/** AV ScatterTracer — 2D points from matrix rows (x,y) or index/value. */
+export function ScatterView({ state }: { state: TracerViewState }) {
+  const data = state.array ?? []
+  const size = 280
+  const c = size / 2
+  const points = data.map((row, i) => {
+    const x = Number(row[0]?.value)
+    const y = Number(row[1]?.value ?? row[0]?.value)
+    return {
+      i,
+      x: Number.isFinite(x) ? x : i,
+      y: Number.isFinite(y) ? y : 0,
+      selected: row.some((cell) => cell.selected),
+      patched: row.some((cell) => cell.patched),
+    }
+  })
+  const maxX = Math.max(1, ...points.map((p) => Math.abs(p.x)))
+  const maxY = Math.max(1, ...points.map((p) => Math.abs(p.y)))
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{state.title || 'Scatter'}</div>
+      <svg width="100%" height={size} className="viz-scatter" role="img" aria-label="散点图">
+        <line x1={24} y1={c} x2={size - 24} y2={c} className="viz-scatter__axis" />
+        <line x1={c} y1={24} x2={c} y2={size - 24} className="viz-scatter__axis" />
+        {points.map((p) => {
+          const px = c + (p.x / maxX) * (c - 32)
+          const py = c - (p.y / maxY) * (c - 32)
           return (
-            <line
-              key={i}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              className={cls}
-              markerEnd={state.isDirected !== false ? 'url(#arrow)' : undefined}
-            />
-          )
-        })}
-        {nodes.map((n) => {
-          const p = nodePos.get(n.id)
-          if (!p) return null
-          const colorCls = n.color === 'red' ? ' is-red' : n.color === 'black' ? ' is-black' : ''
-          const cls =
-            n.selectedCount > 0
-              ? `viz-node is-selected${colorCls}`
-              : n.visitedCount > 0
-                ? `viz-node is-visited${colorCls}`
-                : `viz-node${colorCls}`
-          const label = n.label ?? (n.weight != null ? String(n.weight) : String(n.id))
-          return (
-            <g key={n.id} transform={`translate(${p.x},${p.y})`}>
-              <circle r={14} className={cls} />
-              <text textAnchor="middle" dominantBaseline="central" className="viz-node__label">
-                {label}
-              </text>
-            </g>
+            <circle
+              key={p.i}
+              cx={px}
+              cy={py}
+              r={6}
+              className={
+                p.selected ? 'viz-scatter__dot is-selected' : p.patched ? 'viz-scatter__dot is-patched' : 'viz-scatter__dot'
+              }
+            >
+              <title>{`(${p.x}, ${p.y})`}</title>
+            </circle>
           )
         })}
       </svg>
+    </div>
+  )
+}
+
+/** AV MarkdownTracer — lightweight markdown-ish rendering. */
+export function MarkdownView({ state }: { state: TracerViewState }) {
+  const src = state.markdown ?? ''
+  return (
+    <div className="viz-panel">
+      <div className="viz-panel__title">{state.title || 'Markdown'}</div>
+      <div className="viz-md">
+        {src.split('\n').map((line, i) => {
+          if (!line.trim()) return <div key={i} className="viz-md__p" />
+          if (line.startsWith('### ')) return <h4 key={i}>{line.slice(4)}</h4>
+          if (line.startsWith('## ')) return <h3 key={i}>{line.slice(3)}</h3>
+          if (line.startsWith('# ')) return <h2 key={i}>{line.slice(2)}</h2>
+          if (line.startsWith('- ') || line.startsWith('* ')) return <li key={i}>{line.slice(2)}</li>
+          return (
+            <p key={i} className="viz-md__p">
+              {line}
+            </p>
+          )
+        })}
+        {src ? null : <span className="viz-empty">（空 Markdown）</span>}
+      </div>
     </div>
   )
 }
@@ -348,6 +502,9 @@ export function TracerPanel({ state }: { state: TracerViewState }) {
   if (state.kind === 'CircularQueueTracer') return <CircularQueueView state={state} />
   if (state.kind === 'DequeTracer') return <DequeView state={state} />
   if (state.kind === 'StaticLinkedListTracer') return <StaticLinkedListView state={state} />
+  if (state.kind === 'ChartTracer') return <ChartView state={state} />
+  if (state.kind === 'MarkdownTracer') return <MarkdownView state={state} />
+  if (state.kind === 'ScatterTracer') return <ScatterView state={state} />
   if (state.kind === 'Array1DTracer' || (state.isArray1D && !state.isStaticList)) {
     if (state.kind === 'StackTracer') return <StackView state={state} />
     if (state.kind === 'QueueTracer') return <QueueView state={state} />

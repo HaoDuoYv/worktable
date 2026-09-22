@@ -12,70 +12,74 @@ export function startVizConvertJob(opts: {
   algorithm: Algorithm
   sourceCode: string
   onApplied?: (algorithm: Algorithm) => void
+  onSettled?: () => void
 }) {
-  const { algorithm, sourceCode, onApplied } = opts
+  const { algorithm, sourceCode, onApplied, onSettled } = opts
   const langName = algorithm.language
 
   return startAiJob({
     kind: 'viz',
     title: algorithm.title,
     run: async ({ update }) => {
-      update('请求模型…')
-      if (!sourceCode.trim()) throw new Error('源码为空')
+      try {
+        update('请求模型…')
+        if (!sourceCode.trim()) throw new Error('源码为空')
+        const prompt = [
+          buildAlgoSystemPrompt(),
+          '',
+          '用户源码如下，请转换为带 visualization tracers 的可执行完整代码。',
+          `语言：${langName}`,
+          langName === 'javascript'
+            ? '必须使用 require("algorithm-visualizer")。按算法选用 Array1DTracer/GraphTracer/ChartTracer 等 + LogTracer，Tracer.delay(源码行号)，Layout.setRoot。图算法可用 layoutTree/weighted/visit/select。只输出一个 ```javascript 代码块，不要解释。'
+            : langName === 'python'
+              ? '直接使用注入的 Tracer API（Array1DTracer/GraphTracer/ChartTracer/LogTracer 等），不要 import algorithm_visualizer。Tracer.delay(源码行号)。只输出一个 ```python 代码块。'
+              : '使用 #include "av.h" 与 av:: 命名空间，Layout::setRoot、Tracer::delay(源码行号)。只输出一个 ```cpp 代码块。',
+          '',
+          '【重要】delay 参数 = 源码 0-based 行号，使播放可视化时能高亮源码对应行。',
+          '【源码】',
+          langName === 'python' ? '```python' : langName === 'cpp' ? '```cpp' : '```javascript',
+          sourceCode,
+          '```',
+        ].join('\n')
 
-      const prompt = [
-        buildAlgoSystemPrompt(),
-        '',
-        '用户源码如下，请转换为带 visualization tracers 的可执行完整代码。',
-        `语言：${langName}`,
-        langName === 'javascript'
-          ? '必须使用 require("algorithm-visualizer")，Array1DTracer/LogTracer，Tracer.delay(源码行号)，Layout.setRoot。只输出一个 ```javascript 代码块，不要解释。'
-          : langName === 'python'
-            ? '直接使用注入的 Array1DTracer/LogTracer/Tracer/Layout，不要 import algorithm_visualizer。Tracer.delay(源码行号)。只输出一个 ```python 代码块。'
-            : '使用 #include "av.h" 与 av:: 命名空间，Layout::setRoot、Tracer::delay(源码行号)。只输出一个 ```cpp 代码块。',
-        '',
-        '【重要】delay 参数 = 源码 0-based 行号，使播放可视化时能高亮源码对应行。',
-        '【源码】',
-        langName === 'python' ? '```python' : langName === 'cpp' ? '```cpp' : '```javascript',
-        sourceCode,
-        '```',
-      ].join('\n')
+        const reply = await chatComplete(loadAiSettings(), [
+          { role: 'system', content: buildAlgoSystemPrompt() },
+          { role: 'user', content: prompt },
+        ])
 
-      const reply = await chatComplete(loadAiSettings(), [
-        { role: 'system', content: buildAlgoSystemPrompt() },
-        { role: 'user', content: prompt },
-      ])
+        update('校验代码…')
+        const viz = extractCodeBlock(reply, langName)
+        if (!viz) throw new Error('AI 未返回可用代码块，已保留原可视化代码')
 
-      update('校验代码…')
-      const viz = extractCodeBlock(reply, langName)
-      if (!viz) throw new Error('AI 未返回可用代码块，已保留原可视化代码')
+        const report = validateVizCode(viz, langName)
+        if (!report.ok) throw new Error(formatValidateError(report))
 
-      const report = validateVizCode(viz, langName)
-      if (!report.ok) throw new Error(formatValidateError(report))
+        update('写入本地…')
+        const now = Date.now()
+        const next: Algorithm = {
+          ...algorithm,
+          sourceCode,
+          vizCode: viz,
+          editorMode: 'viz',
+          files: [
+            {
+              name:
+                algorithm.files[0]?.name ??
+                `main.${langName === 'python' ? 'py' : langName === 'cpp' ? 'cpp' : 'js'}`,
+              content: viz,
+            },
+          ],
+          updatedAt: now,
+        }
+        await saveAlgorithm(next)
+        onApplied?.(next)
 
-      update('写入本地…')
-      const now = Date.now()
-      const next: Algorithm = {
-        ...algorithm,
-        sourceCode,
-        vizCode: viz,
-        editorMode: 'viz',
-        files: [
-          {
-            name:
-              algorithm.files[0]?.name ??
-              `main.${langName === 'python' ? 'py' : langName === 'cpp' ? 'cpp' : 'js'}`,
-            content: viz,
-          },
-        ],
-        updatedAt: now,
+        const warn =
+          report.warnings.length > 0 ? `警告：${report.warnings.join('；')}` : '已通过校验'
+        return warn
+      } finally {
+        onSettled?.()
       }
-      await saveAlgorithm(next)
-      onApplied?.(next)
-
-      const warn =
-        report.warnings.length > 0 ? `警告：${report.warnings.join('；')}` : '已通过校验'
-      return warn
     },
   })
 }

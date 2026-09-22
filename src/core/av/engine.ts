@@ -20,13 +20,20 @@ class TracerModel {
   isArray1D = false
   array: CellState[][] = []
   log = ''
+  markdown = ''
   nodes: GraphNodeState[] = []
   edges: GraphEdgeState[] = []
   isDirected = true
+  isWeighted = false
+  layoutMethod: 'circle' | 'tree' | 'random' = 'circle'
   capacity = 0
   head = 0
   tail = 0
   isStaticList = false
+  /** Array1D → ChartTracer sync target (AV Array1DTracer.chart) */
+  chartKey: string | null = null
+  /** Graph → LogTracer sync target (AV GraphTracer.log) */
+  graphLogKey: string | null = null
 
   constructor(key: string, kind: TracerKind, title: string) {
     this.key = key
@@ -42,14 +49,26 @@ class TracerModel {
       isArray1D: this.isArray1D,
       array: this.array.map((row) => row.map((c) => ({ ...c }))),
       log: this.log,
+      markdown: this.markdown || undefined,
       nodes: this.nodes.map((n) => ({ ...n })),
       edges: this.edges.map((e) => ({ ...e })),
       isDirected: this.isDirected,
+      isWeighted: this.isWeighted || undefined,
+      layout: this.isTreeish() ? this.layoutMethod : undefined,
       capacity: this.capacity || undefined,
       head: this.kind === 'CircularQueueTracer' ? this.head : undefined,
       tail: this.kind === 'CircularQueueTracer' ? this.tail : undefined,
       isStaticList: this.isStaticList || undefined,
     }
+  }
+
+  private isTreeish(): boolean {
+    return (
+      this.kind === 'GraphTracer' ||
+      this.kind === 'TreeTracer' ||
+      this.kind === 'RedBlackTreeTracer' ||
+      this.kind === 'BPlusTreeTracer'
+    )
   }
 }
 
@@ -75,52 +94,104 @@ function circleLayout(nodes: GraphNodeState[]) {
   })
 }
 
-/** Top-down hierarchical layout for trees (BFS levels). */
-function treeLayout(nodes: GraphNodeState[], edges: GraphEdgeState[]) {
-  if (nodes.length === 0) return
-  const children = new Map<number, number[]>()
-  const hasParent = new Set<number>()
-  for (const e of edges) {
-    if (!children.has(e.source)) children.set(e.source, [])
-    children.get(e.source)!.push(e.target)
-    hasParent.add(e.target)
+/** Random layout with min-distance rejection (ported from AV GraphTracer.layoutRandom). */
+function randomLayout(nodes: GraphNodeState[]) {
+  const halfW = 140
+  const halfH = 140
+  const placed: GraphNodeState[] = []
+  for (const node of nodes) {
+    let x = 0
+    let y = 0
+    for (let attempt = 0; attempt < 40; attempt++) {
+      x = -halfW + Math.random() * halfW * 2
+      y = -halfH + Math.random() * halfH * 2
+      if (!placed.some((p) => Math.hypot(p.x - x, p.y - y) >= 48)) break
+    }
+    node.x = x
+    node.y = y
+    placed.push(node)
   }
+}
+
+/**
+ * AV-quality hierarchical tree layout (ported from GraphTracer.layoutTree):
+ * leaf-count horizontal packing + depth-based vertical gaps.
+ */
+function treeLayout(nodes: GraphNodeState[], edges: GraphEdgeState[], rootId?: number, sorted = false) {
+  if (nodes.length === 0) return
+  if (nodes.length === 1) {
+    nodes[0]!.x = 0
+    nodes[0]!.y = 0
+    return
+  }
+
+  const linked = new Map<number, number[]>()
+  const link = (a: number, b: number) => {
+    if (!linked.has(a)) linked.set(a, [])
+    linked.get(a)!.push(b)
+  }
+  for (const e of edges) {
+    link(e.source, e.target)
+    link(e.target, e.source)
+  }
+
+  const hasParent = new Set<number>()
+  for (const e of edges) hasParent.add(e.target)
   const roots = nodes.filter((n) => !hasParent.has(n.id)).map((n) => n.id)
-  const rootIds = roots.length > 0 ? roots : [nodes[0]!.id]
-  const level = new Map<number, number>()
-  const order: number[] = []
-  const queue = [...rootIds]
-  for (const r of rootIds) level.set(r, 0)
-  while (queue.length) {
-    const id = queue.shift()!
-    order.push(id)
-    for (const c of children.get(id) ?? []) {
-      if (!level.has(c)) {
-        level.set(c, (level.get(id) ?? 0) + 1)
-        queue.push(c)
-      }
+  const root = rootId != null && nodes.some((n) => n.id === rootId) ? rootId : (roots[0] ?? nodes[0]!.id)
+
+  const baseW = 320
+  const baseH = 280
+  const padding = 24
+  const left = -baseW / 2 + padding
+  const top = -baseH / 2 + padding
+  const width = baseW - padding * 2
+  const height = baseH - padding * 2
+
+  const leafCounts = new Map<number, number>()
+  const maxDepthRef = { max: 0 }
+  const marked = new Set<number>()
+  const analyze = (id: number, depth: number): number => {
+    marked.add(id)
+    if (maxDepthRef.max < depth) maxDepthRef.max = depth
+    let count = 0
+    for (const nb of linked.get(id) ?? []) {
+      if (marked.has(nb)) continue
+      count += analyze(nb, depth + 1)
+    }
+    if (count === 0) count = 1
+    leafCounts.set(id, count)
+    return count
+  }
+  analyze(root, 0)
+  for (const n of nodes) if (!leafCounts.has(n.id)) leafCounts.set(n.id, 1)
+
+  const maxDepth = Math.max(maxDepthRef.max, 1)
+  const hGap = width / (leafCounts.get(root) || 1)
+  const vGap = height / maxDepth
+
+  const placed = new Set<number>()
+  const position = (node: GraphNodeState, h: number, v: number) => {
+    placed.add(node.id)
+    const lc = leafCounts.get(node.id) || 1
+    node.x = left + (h + lc / 2) * hGap
+    node.y = top + v * vGap
+    let kids = (linked.get(node.id) ?? []).filter((id) => !placed.has(id))
+    if (sorted) kids = kids.slice().sort((a, b) => a - b)
+    for (const kidId of kids) {
+      const kid = nodes.find((n) => n.id === kidId)
+      if (!kid || placed.has(kidId)) continue
+      position(kid, h, v + 1)
+      h += leafCounts.get(kidId) || 1
     }
   }
+  const rootNode = nodes.find((n) => n.id === root)
+  if (rootNode) position(rootNode, 0, 0)
   for (const n of nodes) {
-    if (!level.has(n.id)) level.set(n.id, 0)
-  }
-  const byLevel = new Map<number, number[]>()
-  for (const n of nodes) {
-    const lv = level.get(n.id) ?? 0
-    if (!byLevel.has(lv)) byLevel.set(lv, [])
-    byLevel.get(lv)!.push(n.id)
-  }
-  const maxLevel = Math.max(...byLevel.keys())
-  const width = 220
-  const height = 40 + maxLevel * 70
-  for (const [lv, ids] of byLevel) {
-    ids.forEach((id, i) => {
-      const node = nodes.find((n) => n.id === id)
-      if (!node) return
-      const span = ids.length
-      node.x = ((i + 1) / (span + 1) - 0.5) * width
-      node.y = (lv / Math.max(maxLevel, 1) - 0.5) * height
-    })
+    if (!placed.has(n.id)) {
+      n.x = left + width / 2
+      n.y = top + height
+    }
   }
 }
 
@@ -138,9 +209,9 @@ const KNOWN: Record<string, TracerKind> = {
   RedBlackTreeTracer: 'RedBlackTreeTracer',
   BPlusTreeTracer: 'BPlusTreeTracer',
   StaticLinkedListTracer: 'StaticLinkedListTracer',
-  ChartTracer: 'unknown',
-  MarkdownTracer: 'unknown',
-  ScatterTracer: 'unknown',
+  ChartTracer: 'ChartTracer',
+  MarkdownTracer: 'MarkdownTracer',
+  ScatterTracer: 'ScatterTracer',
 }
 
 function isSequenceKind(kind: TracerKind): boolean {
@@ -151,8 +222,30 @@ function isSequenceKind(kind: TracerKind): boolean {
     kind === 'LinkedListTracer' ||
     kind === 'CircularQueueTracer' ||
     kind === 'DequeTracer' ||
-    kind === 'StaticLinkedListTracer'
+    kind === 'StaticLinkedListTracer' ||
+    kind === 'ChartTracer'
   )
+}
+
+/** Minimal sprintf subset matching AV LogTracer.printf (sprintf-js common verbs). */
+function sprintfLite(format: string, args: unknown[]): string {
+  let i = 0
+  return String(format).replace(/%(?:%|[-+0 #]*\d*(?:\.\d+)?[sdifoxXeEgG])/g, (token) => {
+    if (token === '%%') return '%'
+    const arg = args[i++]
+    const conv = token[token.length - 1]
+    if (conv === 'd' || conv === 'i' || conv === 'o' || conv === 'x' || conv === 'X') {
+      const n = Number(arg)
+      if (conv === 'o') return (Math.trunc(n) >>> 0).toString(8)
+      if (conv === 'x') return (Math.trunc(n) >>> 0).toString(16)
+      if (conv === 'X') return (Math.trunc(n) >>> 0).toString(16).toUpperCase()
+      return String(Math.trunc(Number.isFinite(n) ? n : 0))
+    }
+    if (conv === 'f' || conv === 'e' || conv === 'E' || conv === 'g' || conv === 'G') {
+      return String(Number(arg) || 0)
+    }
+    return String(arg ?? '')
+  })
 }
 
 function isTreeishKind(kind: TracerKind): boolean {
@@ -283,6 +376,22 @@ export class AvEngine {
     this.rebuildTreeEdges(model)
   }
 
+  /** Copy Array1D cells into linked ChartTracer (AV Array1DTracer.chart). */
+  private syncChart(source: TracerModel): void {
+    if (!source.chartKey) return
+    const chart = this.objects.get(source.chartKey)
+    if (!chart) return
+    chart.isArray1D = true
+    chart.array = source.array.map((row) => row.map((c) => ({ ...c })))
+  }
+
+  private appendGraphLog(model: TracerModel, line: string): void {
+    if (!model.graphLogKey) return
+    const logModel = this.objects.get(model.graphLogKey)
+    if (!logModel || logModel.kind !== 'LogTracer') return
+    logModel.log += `${line}\n`
+  }
+
   applyCommand(command: AvCommand): void {
     const { key, method: rawMethod, args } = command
     const method = normalizeMethod(rawMethod)
@@ -292,6 +401,11 @@ export class AvEngine {
       return
     }
     if (key === null) return
+
+    if (method === 'destroy') {
+      this.objects.delete(key)
+      return
+    }
 
     if (method.endsWith('Tracer')) {
       this.createTracer(key, method, args[0] as string | undefined)
@@ -318,7 +432,29 @@ export class AvEngine {
       if (method === 'set') model.log = String(args[0] ?? '')
       else if (method === 'print') model.log += String(args[0] ?? '')
       else if (method === 'println') model.log += `${String(args[0] ?? '')}\n`
+      else if (method === 'printf') {
+        const [format, ...rest] = args as [string, ...unknown[]]
+        model.log += sprintfLite(String(format ?? ''), rest)
+      }
       return
+    }
+
+    if (model.kind === 'MarkdownTracer') {
+      if (method === 'set') model.markdown = String(args[0] ?? '')
+      else if (method === 'print') model.markdown += String(args[0] ?? '')
+      else if (method === 'println') model.markdown += `${String(args[0] ?? '')}\n`
+      return
+    }
+
+    // Array1D.chart(chartKey) — link ChartTracer for bar visualization
+    if ((model.kind === 'Array1DTracer' || model.isArray1D) && method === 'chart') {
+      model.chartKey = args[0] == null ? null : String(args[0])
+      this.syncChart(model)
+      return
+    }
+
+    if (model.kind === 'ScatterTracer' || model.kind === 'ChartTracer' || isSequenceKind(model.kind)) {
+      // fall through to array switch (Chart/Scatter store data like Array)
     }
 
     if (model.kind === 'CircularQueueTracer') {
@@ -335,13 +471,19 @@ export class AvEngine {
     switch (method) {
       case 'set': {
         const payload = args[0]
-        if (model.isArray1D || model.kind === 'Array1DTracer') {
+        if (model.isArray1D || model.kind === 'Array1DTracer' || model.kind === 'ChartTracer') {
           model.isArray1D = true
-          model.array = [((payload as unknown[]) ?? []).map(makeCell)]
+          if (Array.isArray(payload) && Array.isArray((payload as unknown[])[0]) && model.kind === 'ScatterTracer') {
+            model.array = (payload as unknown[][]).map((row) => [...(Array.isArray(row) ? row : [row])].map(makeCell))
+            model.isArray1D = false
+          } else {
+            model.array = [((payload as unknown[]) ?? []).map(makeCell)]
+          }
         } else {
           const grid = (payload as unknown[][]) ?? []
           model.array = grid.map((row) => [...(Array.isArray(row) ? row : [row])].map(makeCell))
         }
+        this.syncChart(model)
         break
       }
       case 'patch': {
@@ -352,6 +494,7 @@ export class AvEngine {
             if (v !== undefined) cell.value = v
             cell.patched = true
           }
+          this.syncChart(model)
         } else {
           const [x, y, v] = args as [number, number, unknown]
           const cell = model.array[x]?.[y]
@@ -381,6 +524,7 @@ export class AvEngine {
           const [sx, ex = sx] = args as [number, number?]
           const row = model.array[0] ?? []
           for (let i = sx; i <= ex; i++) if (row[i]) row[i].selected = selected
+          this.syncChart(model)
         } else {
           const [sx, sy, ex = sx, ey = sy] = args as [number, number, number?, number?]
           for (let x = sx; x <= ex; x++) {
@@ -419,6 +563,7 @@ export class AvEngine {
         const cell = makeCell(args[0])
         cell.selected = true
         model.array[0].push(cell)
+        this.syncChart(model)
         break
       }
       case 'pop':
@@ -596,14 +741,16 @@ export class AvEngine {
   }
 
   private applyGraph(model: TracerModel, method: string, args: unknown[]): void {
-    const relayout = () => {
-      if (model.kind === 'TreeTracer' || model.kind === 'RedBlackTreeTracer') {
-        treeLayout(model.nodes, model.edges)
-      } else if (model.kind === 'BPlusTreeTracer') {
-        treeLayout(model.nodes, model.edges)
-      } else {
-        circleLayout(model.nodes)
-      }
+    const relayout = (rootId?: number) => {
+      const mode =
+        model.kind === 'TreeTracer' ||
+        model.kind === 'RedBlackTreeTracer' ||
+        model.kind === 'BPlusTreeTracer'
+          ? 'tree'
+          : model.layoutMethod
+      if (mode === 'tree') treeLayout(model.nodes, model.edges, rootId)
+      else if (mode === 'random') randomLayout(model.nodes)
+      else circleLayout(model.nodes)
     }
     const ensureNode = (id: number, weight: number | null = null) => {
       let n = model.nodes.find((x) => x.id === id)
@@ -627,7 +774,29 @@ export class AvEngine {
         model.isDirected = Boolean(args[0] ?? true)
         break
       case 'weighted':
+        model.isWeighted = Boolean(args[0] ?? true)
         break
+      case 'layoutCircle':
+      case 'layout_circle':
+        model.layoutMethod = 'circle'
+        relayout()
+        break
+      case 'layoutTree':
+      case 'layout_tree': {
+        model.layoutMethod = 'tree'
+        const [rootId] = args as [number?]
+        relayout(rootId)
+        break
+      }
+      case 'layoutRandom':
+      case 'layout_random':
+        model.layoutMethod = 'random'
+        relayout()
+        break
+      case 'log': {
+        model.graphLogKey = args[0] == null ? null : String(args[0])
+        break
+      }
       case 'setColor':
       case 'color': {
         const [id, color] = args as [number, string]
@@ -797,8 +966,26 @@ export class AvEngine {
         break
       }
       case 'addNode': {
-        const [id, weight = null] = args as [number, number | null]
-        ensureNode(id, weight)
+        const [id, weight = null, x, y] = args as [number, number | null, number?, number?]
+        const n = ensureNode(id, weight)
+        if (typeof x === 'number') n.x = x
+        if (typeof y === 'number') n.y = y
+        relayout()
+        break
+      }
+      case 'updateNode': {
+        const [id, weight, x, y] = args as [number, number | undefined, number?, number?]
+        const n = ensureNode(id)
+        if (weight !== undefined) n.weight = weight
+        if (typeof x === 'number') n.x = x
+        if (typeof y === 'number') n.y = y
+        break
+      }
+      case 'removeNode':
+      case 'remove_node': {
+        const [id] = args as [number]
+        model.nodes = model.nodes.filter((n) => n.id !== id)
+        model.edges = model.edges.filter((e) => e.source !== id && e.target !== id)
         relayout()
         break
       }
@@ -818,9 +1005,27 @@ export class AvEngine {
         }
         break
       }
+      case 'updateEdge': {
+        const [source, target, weight] = args as [number, number, number | null]
+        const edge = this.findEdge(model, source, target)
+        if (edge && weight !== undefined) edge.weight = weight
+        break
+      }
+      case 'removeEdge':
+      case 'remove_edge': {
+        const [source, target] = args as [number, number]
+        model.edges = model.edges.filter(
+          (e) =>
+            !(
+              (e.source === source && e.target === target) ||
+              (!model.isDirected && e.source === target && e.target === source)
+            ),
+        )
+        break
+      }
       case 'visit':
       case 'leave': {
-        // visit(target, source, weight)
+        // visit(target, source, weight) — AV also mirrors to linked LogTracer
         const delta = method === 'visit' ? 1 : -1
         const [target, source = null, weight] = args as [number, number | null, number?]
         const node = model.nodes.find((n) => n.id === target)
@@ -830,6 +1035,17 @@ export class AvEngine {
         }
         const edge = this.findEdge(model, source, target)
         if (edge) edge.visitedCount = Math.max(0, edge.visitedCount + delta)
+        if (delta > 0) {
+          this.appendGraphLog(
+            model,
+            source == null || source === undefined ? `${target}` : `${source} -> ${target}`,
+          )
+        } else {
+          this.appendGraphLog(
+            model,
+            source == null || source === undefined ? `${target}` : `${source} <- ${target}`,
+          )
+        }
         break
       }
       case 'select':
@@ -841,6 +1057,17 @@ export class AvEngine {
         if (node) node.selectedCount = Math.max(0, node.selectedCount + delta)
         const edge = this.findEdge(model, source, target)
         if (edge) edge.selectedCount = Math.max(0, edge.selectedCount + delta)
+        if (delta > 0) {
+          this.appendGraphLog(
+            model,
+            source == null || source === undefined ? `${target}` : `${source} => ${target}`,
+          )
+        } else {
+          this.appendGraphLog(
+            model,
+            source == null || source === undefined ? `${target}` : `${source} <= ${target}`,
+          )
+        }
         break
       }
       default:

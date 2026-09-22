@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useMatches, Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuth } from '@/modules/auth/AuthContext'
 import { Icon, WorktableMark, type IconName } from '@/components/Icon'
@@ -32,9 +33,24 @@ function useRouteChrome(): { title: string; flush: boolean } {
 export function AppShell({ children }: { children?: ReactNode }) {
   const { title, flush } = useRouteChrome()
   const { user, isGuest, logout } = useAuth()
+  const [navCollapsed, setNavCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('worktable.nav.collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('worktable.nav.collapsed', navCollapsed ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }, [navCollapsed])
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${navCollapsed ? ' is-nav-collapsed' : ''}`}>
       <a className="skip-link" href="#main-content">
         跳到主内容
       </a>
@@ -43,15 +59,34 @@ export function AppShell({ children }: { children?: ReactNode }) {
           <span className="app-shell__brand-mark" aria-hidden="true">
             <WorktableMark size={30} />
           </span>
-          <span className="app-shell__brand-text">Worktable</span>
+          {!navCollapsed ? <span className="app-shell__brand-text">Worktable</span> : null}
+          <IconButton
+            label={navCollapsed ? '展开侧栏' : '收起侧栏'}
+            title={navCollapsed ? '展开侧栏' : '收起侧栏'}
+            className="app-shell__nav-toggle"
+            onClick={() => setNavCollapsed((v) => !v)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+              {navCollapsed ? (
+                <path d="M15 5v14" stroke="currentColor" strokeWidth="1.5" />
+              ) : (
+                <>
+                  <path d="M9 5v14" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M13 10l2.5 2L13 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </>
+              )}
+            </svg>
+          </IconButton>
         </div>
-        <div className="app-shell__nav-label">工作区</div>
+        {!navCollapsed ? <div className="app-shell__nav-label">工作区</div> : null}
         <ul className="app-shell__nav-list">
           {NAV_ITEMS.map((item) => (
             <li key={item.to}>
               <NavLink
                 to={item.to}
                 end={item.end}
+                title={item.label}
                 className={({ isActive }) =>
                   `app-shell__nav-link${isActive ? ' is-active' : ''}`
                 }
@@ -59,15 +94,17 @@ export function AppShell({ children }: { children?: ReactNode }) {
                 <span className="app-shell__nav-icon">
                   <Icon name={item.icon} size={20} />
                 </span>
-                {item.label}
+                {!navCollapsed ? item.label : null}
               </NavLink>
             </li>
           ))}
         </ul>
-        <div className="app-shell__nav-footer">
-          <span className="app-shell__status-dot" aria-hidden="true" />
-          版本 0.3.0
-        </div>
+        {!navCollapsed ? (
+          <div className="app-shell__nav-footer">
+            <span className="app-shell__status-dot" aria-hidden="true" />
+            版本 0.3.0
+          </div>
+        ) : null}
       </nav>
 
       <header className="app-shell__header">

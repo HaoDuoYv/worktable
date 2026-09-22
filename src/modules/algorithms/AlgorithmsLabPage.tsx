@@ -1,15 +1,12 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ChipRow, type ChipOption } from '@/components/Chip'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { CodeEditor } from '@/components/CodeEditor'
 import { PlayerBar, type Speed } from '@/components/PlayerBar'
 import { Button } from '@/components/Button'
 import { IconButton } from '@/components/IconButton'
 import { Icon } from '@/components/Icon'
 import { SelectMenu } from '@/components/SelectMenu'
-import { Disclosure } from '@/components/Disclosure'
 import { Switch } from '@/components/Switch'
 import { ResizeHandle, usePersistedWidth } from '@/components/Resizable'
-import { VizStatsPanel } from '@/components/VizStatsPanel'
 import { AvEngine } from '@/core/av/engine'
 import { TracerPanel, VariableInspector } from '@/core/av/renderers'
 import type { AvCommand } from '@/core/av/types'
@@ -34,18 +31,11 @@ import {
   isAiConfigured,
 } from '@/modules/ai/aiClient'
 
-type FilterMode = 'all' | 'favorite' | 'mine'
-
-const LANG_OPTIONS: ChipOption<AlgoLanguage>[] = [
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'python', label: 'Python' },
-  { value: 'cpp', label: 'C++' },
-]
-
-const FILTER_OPTIONS: ChipOption<FilterMode>[] = [
-  { value: 'all', label: '全部' },
-  { value: 'favorite', label: '收藏' },
-  { value: 'mine', label: '我的' },
+/** Compact language switcher labels for the left-nav dock. */
+const LANG_SHORT: { value: AlgoLanguage; short: string; title: string }[] = [
+  { value: 'javascript', short: 'JS', title: 'JavaScript' },
+  { value: 'python', short: 'Py', title: 'Python' },
+  { value: 'cpp', short: 'C++', title: 'C++' },
 ]
 
 const BASE_INTERVAL = 450
@@ -94,6 +84,54 @@ function usePersistedFlag(key: string, fallback: boolean) {
   return [value, set] as const
 }
 
+function usePersistedString(key: string, fallback: string) {
+  const [value, setValue] = useState(() => {
+    try {
+      return localStorage.getItem(key) ?? fallback
+    } catch {
+      return fallback
+    }
+  })
+  const set = useCallback(
+    (next: string) => {
+      setValue(next)
+      try {
+        localStorage.setItem(key, next)
+      } catch {
+        /* ignore */
+      }
+    },
+    [key],
+  )
+  return [value, set] as const
+}
+
+function usePersistedJSON<T>(key: string, fallback: T) {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const raw = localStorage.getItem(key)
+      return raw ? (JSON.parse(raw) as T) : fallback
+    } catch {
+      return fallback
+    }
+  })
+  const set = useCallback(
+    (next: T | ((prev: T) => T)) => {
+      setValue((prev) => {
+        const resolved = typeof next === 'function' ? (next as (p: T) => T)(prev) : next
+        try {
+          localStorage.setItem(key, JSON.stringify(resolved))
+        } catch {
+          /* ignore */
+        }
+        return resolved
+      })
+    },
+    [key],
+  )
+  return [value, set] as const
+}
+
 /** Six-dot drag grip shown on every panel chrome (visual affordance for panel dragging). */
 function GripIcon() {
   return (
@@ -132,8 +170,12 @@ function PanelChrome({
       <span className="panel-chrome__spacer" />
       {right}
       {onCollapse ? (
-        <IconButton label={collapseLabel ?? '折叠面板'} onClick={onCollapse}>
-          <Icon name="chevron-down" size={16} className="panel-chrome__fold-icon" />
+        <IconButton label={collapseLabel ?? '折叠面板'} title={collapseLabel ?? '折叠面板'} onClick={onCollapse}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="panel-chrome__fold-icon">
+            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M9 5v14" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M15.5 10l-2 2 2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </IconButton>
       ) : null}
     </div>
@@ -151,9 +193,16 @@ function downloadJson(filename: string, data: unknown) {
 }
 
 export function AlgorithmsLabPage() {
-  const [lang, setLang] = useState<AlgoLanguage>('javascript')
-  const [filter, setFilter] = useState<FilterMode>('all')
-  const [category, setCategory] = useState<string>('all')
+  const [lang, setLangState] = useState<AlgoLanguage>(() => {
+    try {
+      const raw = localStorage.getItem('algolab.lib.lang')
+      if (raw === 'python' || raw === 'cpp' || raw === 'javascript') return raw
+    } catch {
+      /* ignore */
+    }
+    return 'javascript'
+  })
+  const [navSel, setNavSel] = usePersistedString('algolab.nav.sel', 'all')
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<Algorithm[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -162,15 +211,40 @@ export function AlgorithmsLabPage() {
   const [desc, setDesc] = useState('')
   const [dirty, setDirty] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [exitingId, setExitingId] = useState<string | null>(null)
   const [bulkMode, setBulkMode] = useState(false)
   const [bulkIds, setBulkIds] = useState<Set<string>>(new Set())
   const [editorMode, setEditorMode] = useState<'source' | 'viz'>('viz')
   const [aiOpen, setAiOpen] = useState(false)
-  const [aiAutoAsk, setAiAutoAsk] = useState<string | undefined>(undefined)
   const [converting, setConverting] = useState(false)
   const [mobileTab, setMobileTab] = useState<'library' | 'viz' | 'code'>('viz')
+  const [openCats, setOpenCats] = usePersistedJSON<Record<string, boolean>>('algolab.nav.open', {})
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement | null>(null)
+  /** VS Code Explorer-style context menu */
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number
+    y: number
+    target: 'folder' | 'file' | 'blank'
+    category?: string
+    algoId?: string
+  } | null>(null)
+  const [renameState, setRenameState] = useState<{
+    kind: 'folder' | 'file'
+    key: string
+    value: string
+  } | null>(null)
+  const [confirmFolderDel, setConfirmFolderDel] = useState<string | null>(null)
+  const [confirmFileDel, setConfirmFileDel] = useState<string | null>(null)
+  /** Tree focus drives create-target path (folder selected → inside; file → parent). */
+  const [treeFocus, setTreeFocus] = useState<
+    | { kind: 'none' }
+    | { kind: 'folder'; category: string }
+    | { kind: 'file'; id: string; category: string }
+  >({ kind: 'none' })
+  /** Empty folders (no algos yet) — categories otherwise derive from algorithm.category. */
+  const [extraFolders, setExtraFolders] = usePersistedJSON<string[]>('algolab.nav.folders', [])
+  const ctxRef = useRef<HTMLDivElement | null>(null)
 
   const [building, setBuilding] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -179,6 +253,7 @@ export function AlgorithmsLabPage() {
   const [cursor, setCursor] = useState(0)
   const [activeLine, setActiveLine] = useState<number | null>(null)
   const [tracers, setTracers] = useState<ReturnType<AvEngine['getAll']>>([])
+  const [chunkTotal, setChunkTotal] = useState(0)
 
   /* —— Panel layout state (persisted) —— */
   const [libW, setLibW] = usePersistedWidth('algolab.lib.w', 260)
@@ -188,6 +263,9 @@ export function AlgorithmsLabPage() {
   const [preset, setPreset] = useState<LayoutPreset>('default')
   const [logTab, setLogTab] = useState<'log' | 'stats'>('log')
   const [autoScroll, setAutoScroll] = usePersistedFlag('algolab.log.autoscroll', true)
+  const [logCollapsed, setLogCollapsed] = usePersistedFlag('algolab.log.collapsed', false)
+  const [logH, setLogH] = usePersistedWidth('algolab.log.h', 168)
+  const logStart = useRef(logH)
   const libStart = useRef(libW)
   const codeStart = useRef(codeW)
   const logBodyRef = useRef<HTMLDivElement | null>(null)
@@ -195,11 +273,188 @@ export function AlgorithmsLabPage() {
   const engineRef = useRef(new AvEngine())
   const timerRef = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const total = engineRef.current.getChunkCount()
+  const total = chunkTotal
 
   const selected = useMemo(
     () => items.find((a) => a.id === selectedId) ?? null,
     [items, selectedId],
+  )
+
+  const setLang = useCallback((next: AlgoLanguage) => {
+    setLangState(next)
+    try {
+      localStorage.setItem('algolab.lib.lang', next)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const toggleCat = useCallback(
+    (cat: string, force?: boolean) => {
+      setOpenCats((prev) => ({
+        ...prev,
+        [cat]: force ?? !prev[cat],
+      }))
+    },
+    [setOpenCats],
+  )
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    window.setTimeout(() => setToast(null), 2500)
+  }, [])
+
+  /** Create-target category: none→根「其他」; folder→其内; file→父文件夹（VS Code）. */
+  const resolveCreateCategory = useCallback(() => {
+    if (treeFocus.kind === 'folder') return treeFocus.category || '其他'
+    if (treeFocus.kind === 'file') return treeFocus.category || '其他'
+    return '其他'
+  }, [treeFocus])
+
+  const openCtx = useCallback(
+    (e: React.MouseEvent, target: 'folder' | 'file' | 'blank', category?: string, algoId?: string) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setCtxMenu({ x: e.clientX, y: e.clientY, target, category, algoId })
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    const close = () => setCtxMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [ctxMenu])
+
+  const uniqueFolderName = useCallback(
+    (base: string) => {
+      const taken = new Set([
+        ...items.map((a) => a.category || '其他'),
+        ...extraFolders,
+      ])
+      if (!taken.has(base)) return base
+      let i = 2
+      while (taken.has(`${base} ${i}`)) i++
+      return `${base} ${i}`
+    },
+    [items, extraFolders],
+  )
+
+  /** ＋文件 / 右键新建文件 → 空文件（不提供示例骨架） */
+  const handleNewFileIn = useCallback(
+    async (category?: string) => {
+      const now = Date.now()
+      const language = lang
+      const cat = category || resolveCreateCategory()
+      const ext = language === 'python' ? 'py' : language === 'cpp' ? 'cpp' : 'js'
+      const title = '未命名算法'
+      const empty = ''
+      const algo: Algorithm = {
+        id: createAlgorithmId(),
+        title,
+        description: '',
+        language,
+        category: cat,
+        tags: [],
+        favorite: false,
+        createdAt: now,
+        updatedAt: now,
+        source: 'user',
+        files: [{ name: `main.${ext}`, content: empty }],
+        sourceCode: empty,
+        vizCode: undefined,
+        editorMode: 'source',
+      }
+      await saveAlgorithm(algo)
+      const all = await listAlgorithms()
+      setItems(all)
+      setSelectedId(algo.id)
+      setNavSel(cat)
+      toggleCat(cat, true)
+      setTreeFocus({ kind: 'file', id: algo.id, category: cat })
+      setRenameState({ kind: 'file', key: algo.id, value: title })
+      showToast('已新建空算法')
+    },
+    [lang, resolveCreateCategory, setNavSel, showToast, toggleCat],
+  )
+
+  /** ＋文件夹 / 右键新建文件夹 → 根级分类，立即重命名 */
+  const handleNewFolder = useCallback(async () => {
+    const name = uniqueFolderName('新文件夹')
+    setExtraFolders((prev) => (prev.includes(name) ? prev : [...prev, name]))
+    setOpenCats((prev) => ({ ...prev, [name]: true }))
+    setNavSel(name)
+    setTreeFocus({ kind: 'folder', category: name })
+    setRenameState({ kind: 'folder', key: name, value: name })
+    showToast('已新建文件夹，可重命名')
+  }, [setExtraFolders, setNavSel, setOpenCats, showToast, uniqueFolderName])
+
+  const commitRename = useCallback(async () => {
+    if (!renameState) return
+    const nextName = renameState.value.trim()
+    if (!nextName) {
+      setRenameState(null)
+      return
+    }
+    if (renameState.kind === 'folder') {
+      const oldName = renameState.key
+      if (nextName !== oldName) {
+        const affected = items.filter((a) => (a.category || '其他') === oldName)
+        if (affected.length) {
+          await bulkPutAlgorithms(
+            affected.map((a) => ({ ...a, category: nextName, updatedAt: Date.now() })),
+          )
+        }
+        setExtraFolders((prev) => prev.map((f) => (f === oldName ? nextName : f)))
+        setOpenCats((prev) => {
+          const { [oldName]: _drop, ...rest } = prev
+          return { ...rest, [nextName]: true }
+        })
+        setNavSel(nextName)
+        setTreeFocus({ kind: 'folder', category: nextName })
+      }
+    } else {
+      const algo = items.find((a) => a.id === renameState.key)
+      if (algo && nextName !== algo.title) {
+        await saveAlgorithm({ ...algo, title: nextName, updatedAt: Date.now() })
+      }
+    }
+    const all = await listAlgorithms()
+    setItems(all)
+    setRenameState(null)
+    showToast('已重命名')
+  }, [items, renameState, setExtraFolders, setNavSel, setOpenCats, showToast])
+
+  const handleDeleteFolder = useCallback(
+    async (category: string, dropAlgos: boolean) => {
+      const affected = items.filter((a) => (a.category || '其他') === category)
+      if (dropAlgos) {
+        for (const a of affected) await deleteAlgorithm(a.id)
+      } else if (affected.length) {
+        await bulkPutAlgorithms(
+          affected.map((a) => ({ ...a, category: '其他', updatedAt: Date.now() })),
+        )
+      }
+      setExtraFolders((prev) => prev.filter((f) => f !== category))
+      setOpenCats((prev) => {
+        const { [category]: _drop, ...rest } = prev
+        return rest
+      })
+      if (navSel === category) setNavSel('all')
+      setConfirmFolderDel(null)
+      setCtxMenu(null)
+      const all = await listAlgorithms()
+      setItems(all)
+      showToast(dropAlgos ? '已删除文件夹与内含算法' : '已删除文件夹，算法归入「其他」')
+    },
+    [items, navSel, setExtraFolders, setNavSel, setOpenCats, showToast],
   )
 
   /* —— Derived view state for the panel layout —— */
@@ -246,13 +501,9 @@ export function AlgorithmsLabPage() {
   useEffect(() => {
     if (!autoScroll || logTab !== 'log') return
     const el = logBodyRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    el.scrollTop = el.scrollHeight
   }, [tracers, autoScroll, logTab])
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg)
-    window.setTimeout(() => setToast(null), 2500)
-  }, [])
 
   const stopPlay = useCallback(() => {
     if (timerRef.current) {
@@ -266,6 +517,7 @@ export function AlgorithmsLabPage() {
     const engine = engineRef.current
     engine.replayTo(next)
     setCursor(engine.getCursor())
+    setChunkTotal(engine.getChunkCount())
     const line = engine.getCurrentLine()
     setActiveLine(line === undefined ? null : line + 1)
     setTracers(engine.getAll())
@@ -300,7 +552,10 @@ export function AlgorithmsLabPage() {
     setSelectedId(inLang[0].id)
   }, [lang, items, selected])
 
-  // load editor when selection changes
+  // load editor when selection **content** changes（忽略 lastRunAt 等元数据，避免回放被重置）
+  const selKey = selected
+    ? `${selected.id}|${selected.editorMode ?? 'viz'}|${selected.sourceCode ?? ''}|${selected.vizCode ?? ''}|${selected.title}`
+    : ''
   useEffect(() => {
     if (!selected) {
       setCode('')
@@ -318,9 +573,11 @@ export function AlgorithmsLabPage() {
     setError(null)
     engineRef.current.setCommands([])
     setCursor(0)
+    setChunkTotal(0)
     setActiveLine(null)
     setTracers([])
-  }, [selected, stopPlay])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey, stopPlay])
 
   const switchEditorMode = useCallback(
     (mode: 'source' | 'viz') => {
@@ -344,9 +601,18 @@ export function AlgorithmsLabPage() {
     [code, editorMode, selected],
   )
 
-  /** Convert source to visualization code in a background job (survives navigation). */
+  /** 生成可视化：互斥 + 已有结果时确认覆盖 */
   const silentVisualize = useCallback(() => {
     if (!selected) return
+    if (converting) {
+      showToast('正在生成可视化，请稍候')
+      return
+    }
+    const hasViz = Boolean(selected.vizCode && selected.vizCode.trim())
+    if (hasViz) {
+      const ok = window.confirm('已存在可视化代码，是否重新生成并覆盖？')
+      if (!ok) return
+    }
     if (!isAiConfigured()) {
       setError('请先在设置中配置 AI 接口地址与密钥。')
       return
@@ -364,38 +630,76 @@ export function AlgorithmsLabPage() {
       sourceCode: src,
       onApplied: (next) => {
         void listAlgorithms().then((all) => setItems(all))
+        setConverting(false)
         if (selectedId !== algoId) return
         setEditorMode('viz')
         setCode(next.vizCode ?? '')
         setDirty(false)
         showToast('已生成可视化代码并通过校验')
-        setConverting(false)
       },
     })
-    // Job dock shows progress; local chip only flashes briefly
-    window.setTimeout(() => setConverting(false), 600)
-  }, [code, editorMode, selected, selectedId, showToast])
+  }, [code, converting, editorMode, selected, selectedId, showToast])
 
 
   const categories = useMemo(() => {
-    const set = new Set(items.map((a) => a.category))
-    return ['all', ...[...set].sort()]
-  }, [items])
+    const set = new Set(items.filter((a) => a.language === lang).map((a) => a.category || '其他'))
+    for (const f of extraFolders) set.add(f)
+    return [...set].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  }, [items, lang, extraFolders])
+
+  const matchesQuery = useCallback(
+    (a: Algorithm) => {
+      if (!query.trim()) return true
+      const q = query.trim().toLowerCase()
+      const hay = `${a.title} ${a.description ?? ''} ${a.tags.join(' ')}`.toLowerCase()
+      return hay.includes(q)
+    },
+    [query],
+  )
+
+  const langItems = useMemo(
+    () => items.filter((a) => a.language === lang && matchesQuery(a)),
+    [items, lang, matchesQuery],
+  )
 
   const visible = useMemo(() => {
-    return items.filter((a) => {
-      if (a.language !== lang) return false
-      if (filter === 'favorite' && !a.favorite) return false
-      if (filter === 'mine' && a.source !== 'user') return false
-      if (category !== 'all' && a.category !== category) return false
-      if (query.trim()) {
-        const q = query.trim().toLowerCase()
-        const hay = `${a.title} ${a.description ?? ''} ${a.tags.join(' ')}`.toLowerCase()
-        if (!hay.includes(q)) return false
+    if (navSel === '__fav') return langItems.filter((a) => a.favorite)
+    if (navSel === 'all') return langItems
+    return langItems.filter((a) => (a.category || '其他') === navSel)
+  }, [langItems, navSel])
+
+  const favItems = useMemo(() => langItems.filter((a) => a.favorite), [langItems])
+
+  const navPath = useMemo(() => {
+    if (navSel === '__fav') return '收藏'
+    if (navSel !== 'all') return navSel
+    return selected?.category || '算法库'
+  }, [navSel, selected])
+
+  useEffect(() => {
+    if (!moreOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [moreOpen])
+
+  useEffect(() => {
+    if (!query.trim()) return
+    const hits = new Set(langItems.map((a) => a.category || '其他'))
+    setOpenCats((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const c of hits) {
+        if (!next[c]) {
+          next[c] = true
+          changed = true
+        }
       }
-      return true
+      return changed ? next : prev
     })
-  }, [items, lang, filter, category, query])
+  }, [query, langItems, setOpenCats])
 
   const persistSelected = useCallback(
     async (patch: Partial<Algorithm>) => {
@@ -434,41 +738,16 @@ export function AlgorithmsLabPage() {
     }
     await persistSelected(patch)
     setDirty(false)
-    showToast('已保存')
-  }, [code, desc, editorMode, persistSelected, selected, showToast, title])
+  }, [code, desc, editorMode, persistSelected, selected, title])
 
-  const handleNew = useCallback(async () => {
-    const now = Date.now()
-    const language = lang
-    const skeleton =
-      language === 'python'
-        ? `# Worktable 注入 tracers：Array1DTracer, LogTracer, Tracer, Layout, VerticalLayout\n\narray1d = Array1DTracer("数组")\nlog = LogTracer("日志")\n\n\ndef main():\n    Layout.setRoot(VerticalLayout([array1d, log]))\n    array1d.set([3, 1, 4, 1, 5])\n    Tracer.delay()\n    log.println("开始")\n    Tracer.delay()\n\n\nmain()\n`
-        : language === 'cpp'
-          ? `#include "av.h"\n#include <vector>\nusing namespace av;\n\nint main() {\n  Array1DTracer array1d("数组");\n  LogTracer log("日志");\n  std::vector<int> A = {3, 1, 4};\n  VerticalLayout layout({&array1d, &log});\n  Layout.setRoot(layout);\n  array1d.set(A);\n  Tracer::delay(11);\n  log.println("开始");\n  Tracer::delay(13);\n  return 0;\n}\n`
-          : `const { Array1DTracer, LogTracer, Tracer, Layout, VerticalLayout } = require('algorithm-visualizer');\n\nconst array1dTracer = new Array1DTracer('数组');\nconst logTracer = new LogTracer('日志');\n\n(function main() {\n  Layout.setRoot(new VerticalLayout([array1dTracer, logTracer]));\n  array1dTracer.set([3, 1, 4, 1, 5]);\n  Tracer.delay();\n  logTracer.println('开始');\n  Tracer.delay();\n})();\n`
-    const ext = language === 'python' ? 'py' : language === 'cpp' ? 'cpp' : 'js'
-    const algo: Algorithm = {
-      id: createAlgorithmId(),
-      title: '未命名算法',
-      description: '',
-      language,
-      category: '其他',
-      tags: [],
-      favorite: false,
-      createdAt: now,
-      updatedAt: now,
-      source: 'user',
-      files: [{ name: `main.${ext}`, content: skeleton }],
-      sourceCode: skeleton,
-      vizCode: skeleton,
-      editorMode: 'source',
-    }
-    await saveAlgorithm(algo)
-    const all = await listAlgorithms()
-    setItems(all)
-    setSelectedId(algo.id)
-    showToast('已新建算法')
-  }, [lang, showToast])
+  // 编辑后防抖自动保存
+  useEffect(() => {
+    if (!dirty || !selected) return
+    const t = window.setTimeout(() => {
+      void handleSave()
+    }, 700)
+    return () => window.clearTimeout(t)
+  }, [code, title, desc, dirty, selected, handleSave])
 
   const handleSaveAs = useCallback(async () => {
     if (!selected) return
@@ -497,7 +776,7 @@ export function AlgorithmsLabPage() {
 
   const handleDelete = useCallback(
     async (id: string) => {
-      setPendingDeleteId(null)
+      setConfirmFileDel(null)
       // Curved Card Deletion — animate then remove (§8)
       setExitingId(id)
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -628,11 +907,17 @@ export function AlgorithmsLabPage() {
       }
       const commands = result.commands as AvCommand[]
       engineRef.current.setCommands(commands)
-      applyCursor(0)
+      const n = engineRef.current.getChunkCount()
+      engineRef.current.replayTo(Math.min(1, n))
+      setCursor(engineRef.current.getCursor())
+      setChunkTotal(n)
+      setTracers(engineRef.current.getAll())
+      const ln = engineRef.current.getCurrentLine()
+      setActiveLine(ln === undefined ? null : ln + 1)
       if (selected) {
         void saveAlgorithm({ ...selected, lastRunAt: Date.now() })
       }
-      if (engineRef.current.getChunkCount() > 0) setPlaying(true)
+      if (engineRef.current.getCursor() < n) setPlaying(true)
     } finally {
       setBuilding(false)
     }
@@ -710,22 +995,17 @@ export function AlgorithmsLabPage() {
           <aside className="panel panel-rail panel-rail--lib" aria-label="算法库已折叠">
             <IconButton
               label="展开算法库"
+              title="展开算法库"
               onClick={() => {
                 setLibCollapsed(false)
                 markCustom()
               }}
             >
-              <Icon name="algorithms" size={18} />
-            </IconButton>
-            <IconButton
-              label="新建算法"
-              onClick={() => {
-                setLibCollapsed(false)
-                markCustom()
-                void handleNew()
-              }}
-            >
-              <Icon name="save-copy" size={18} />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M9 4v16" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M13 10l2.5 2L13 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </IconButton>
           </aside>
         ) : (
@@ -735,44 +1015,69 @@ export function AlgorithmsLabPage() {
           >
             <PanelChrome
               title="算法库"
-              subtitle={`${visible.length} 项`}
+              subtitle={navPath}
               onCollapse={() => {
                 setLibCollapsed(true)
                 markCustom()
               }}
               collapseLabel="折叠算法库"
             />
-            <div className="algo-lab__nav-head">
-              <ChipRow ariaLabel="语言" options={LANG_OPTIONS} value={lang} onChange={setLang} />
-              <ChipRow ariaLabel="筛选" options={FILTER_OPTIONS} value={filter} onChange={setFilter} />
-              <input
-                className="algo-search"
-                placeholder="搜索标题、标签…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <select
-                className="algo-select"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                aria-label="分类"
+
+            <div className="algo-lab__nav-toolbar" role="toolbar" aria-label="文件操作">
+              <button type="button" className="nav-tool" title="新建文件夹" aria-label="新建文件夹" onClick={() => void handleNewFolder()}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3 7.5h7l2 2H21v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7.5z" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M12 12v5M9.5 14.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button type="button" className="nav-tool" title="新建文件" aria-label="新建文件" onClick={() => void handleNewFileIn()}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M14 3.5v4h4M12 11v6M9 14h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button type="button" className="nav-tool" title="刷新" aria-label="刷新" onClick={() => void refresh()}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M19 12a7 7 0 1 1-2-4.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M19 5v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="nav-tool"
+                title="折叠全部"
+                aria-label="折叠全部"
+                onClick={() => setOpenCats({})}
               >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c === 'all' ? '全部分类' : c}
-                  </option>
-                ))}
-              </select>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <Button size="sm" variant="primary" onClick={() => void handleNew()}>
-                  新建
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => void handleExport()}>
-                  导出
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => fileInputRef.current?.click()}>
-                  导入
-                </Button>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 5h12M8 10h8M10 15h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              <span className="nav-tool__spacer" />
+              <div className="nav-more" ref={moreRef}>
+                <button
+                  type="button"
+                  className="nav-tool"
+                  title="更多"
+                  aria-label="更多"
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen}
+                  onClick={() => setMoreOpen((v) => !v)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="6" cy="12" r="1.6" />
+                    <circle cx="12" cy="12" r="1.6" />
+                    <circle cx="18" cy="12" r="1.6" />
+                  </svg>
+                </button>
+                {moreOpen ? (
+                  <div className="nav-more__menu" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); fileInputRef.current?.click() }}>导入 …</button>
+                    <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); void handleExport() }}>导出 …</button>
+                    <hr className="nav-more__sep" />
+                    <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setBulkMode(true); setBulkIds(new Set()) }}>多选</button>
+                  </div>
+                ) : null}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -786,124 +1091,304 @@ export function AlgorithmsLabPage() {
                 />
               </div>
             </div>
-            <div className="bulk-bar">
-              <Button
-                size="sm"
-                variant={bulkMode ? 'primary' : 'ghost'}
-                onClick={() => {
-                  setBulkMode((m) => !m)
-                  setBulkIds(new Set())
-                }}
-              >
-                {bulkMode ? '退出多选' : '多选'}
-              </Button>
-              {bulkMode ? (
-                <>
-                  <Button size="sm" variant="ghost" onClick={selectAllVisible}>
-                    全选
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    disabled={bulkIds.size === 0}
-                    onClick={() => void handleBulkDelete()}
-                  >
-                    删除所选（{bulkIds.size}）
-                  </Button>
-                </>
-              ) : (
-                <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
-                  {visible.length} 项
-                </span>
-              )}
+
+            <div className="algo-lab__nav-search">
+              <span className="algo-search__icon" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M16 16l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                className="algo-search"
+                placeholder="Search …"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="搜索算法"
+              />
             </div>
-            <ul className="algo-lab__list">
-              {visible.map((a, idx) => (
-                <li
-                  key={a.id}
-                  className={[
-                    pendingDeleteId === a.id ? 'is-pending-delete' : '',
-                    exitingId === a.id ? 'is-exiting' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  <div
-                    className={`algo-item${a.id === selectedId ? ' is-active' : ''}${
-                      exitingId === a.id ? ' is-exiting' : ''
-                    }`}
-                    style={bulkMode ? { animationDelay: `${idx * 12}ms` } : undefined}
-                  >
-                    <span className="trash-zone" aria-hidden="true">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M4 7h16M9 7V5h6v2M8 7l1 12h6l1-12"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </span>
-                    {bulkMode ? (
-                      <button
-                        type="button"
-                        className="algo-item__main"
-                        onClick={() => toggleBulk(a.id)}
-                        aria-label={`选择 ${a.title}`}
-                      >
-                        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span className={`bulk-check${bulkIds.has(a.id) ? ' is-checked' : ''}`}>
-                            {bulkIds.has(a.id) ? '✓' : ''}
-                          </span>
-                          <span className="algo-item__title">{a.title}</span>
-                        </span>
-                        <span className="algo-item__meta">
-                          {a.category} · {a.tags.slice(0, 2).join(' / ') || '无标签'}
-                        </span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="algo-item__main"
-                        onClick={() => setSelectedId(a.id)}
-                      >
-                        <span className="algo-item__title">
-                          {a.favorite ? '★ ' : ''}
-                          {a.title}
-                        </span>
-                        <span className="algo-item__meta">
-                          {a.category} · {a.tags.slice(0, 2).join(' / ') || '无标签'}
-                        </span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="algo-item__del"
-                      title="删除"
-                      aria-label={`删除 ${a.title}`}
-                      onClick={() => setPendingDeleteId(a.id)}
+
+            {bulkMode ? (
+              <div className="bulk-bar" role="toolbar" aria-label="多选操作">
+                <Button size="sm" variant="ghost" onClick={() => { setBulkMode(false); setBulkIds(new Set()) }}>退出多选</Button>
+                <Button size="sm" variant="ghost" onClick={selectAllVisible}>全选</Button>
+                <Button size="sm" variant="danger" disabled={bulkIds.size === 0} onClick={() => void handleBulkDelete()}>
+                  删除（{bulkIds.size}）
+                </Button>
+              </div>
+            ) : null}
+
+            <div
+              className="algo-lab__nav-tree"
+              role="tree"
+              aria-label="算法文件树"
+              onContextMenu={(e) => openCtx(e, 'blank')}
+            >
+              {categories.map((cat) => {
+                const catItems = langItems.filter((a) => (a.category || '其他') === cat)
+                const isOpen = Boolean(openCats[cat])
+                const isFolderActive = treeFocus.kind === 'folder' && treeFocus.category === cat
+                if (query.trim() && catItems.length === 0) return null
+                return (
+                  <div key={cat} className="nav-group" role="none">
+                    <div
+                      role="treeitem"
+                      aria-expanded={isOpen}
+                      aria-selected={isFolderActive || navSel === cat}
+                      className={`nav-cat${isFolderActive || navSel === cat ? ' is-active' : ''}`}
+                      onClick={() => {
+                        setNavSel(cat)
+                        setTreeFocus({ kind: 'folder', category: cat })
+                        toggleCat(cat)
+                      }}
+                      onContextMenu={(e) => openCtx(e, 'folder', cat)}
                     >
-                      ×
-                    </button>
-                  </div>
-                  {pendingDeleteId === a.id ? (
-                    <div className="algo-item__confirm">
-                      <span>确认删除？</span>
-                      <Button size="sm" variant="danger" onClick={() => void handleDelete(a.id)}>
-                        删除
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setPendingDeleteId(null)}>
-                        取消
-                      </Button>
+                      <span className={`nav-cat__chev${isOpen ? ' is-open' : ''}`} aria-hidden="true">
+                        {isOpen ? '▾' : '▸'}
+                      </span>
+                      <span className="nav-cat__icon" aria-hidden="true">📁</span>
+                      {renameState?.kind === 'folder' && renameState.key === cat ? (
+                        <input
+                          className="nav-rename"
+                          autoFocus
+                          value={renameState.value}
+                          onChange={(e) => setRenameState({ ...renameState, value: e.target.value })}
+                          onBlur={() => void commitRename()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void commitRename()
+                            if (e.key === 'Escape') setRenameState(null)
+                          }}
+                        />
+                      ) : (
+                        <span className="nav-cat__name">{cat}</span>
+                      )}
                     </div>
-                  ) : null}
-                </li>
-              ))}
-              {visible.length === 0 ? (
-                <li className="algo-empty">没有匹配的算法</li>
+                    {isOpen ? (
+                      <ul className="nav-kids" role="group">
+                        {catItems.map((a) => (
+                          <li
+                            key={a.id}
+                            className={exitingId === a.id ? 'is-exiting' : ''}
+                          >
+                            <div
+                              className={`nav-file${a.id === selectedId ? ' is-active' : ''}`}
+                              onClick={() => {
+                                setSelectedId(a.id)
+                                setTreeFocus({ kind: 'file', id: a.id, category: a.category || '其他' })
+                              }}
+                              onContextMenu={(e) => openCtx(e, 'file', a.category || '其他', a.id)}
+                            >
+                              <span className="nav-file__icon" aria-hidden="true">📄</span>
+                              {renameState?.kind === 'file' && renameState.key === a.id ? (
+                                <input
+                                  className="nav-rename"
+                                  autoFocus
+                                  value={renameState.value}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => setRenameState({ ...renameState, value: e.target.value })}
+                                  onBlur={() => void commitRename()}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') void commitRename()
+                                    if (e.key === 'Escape') setRenameState(null)
+                                  }}
+                                />
+                              ) : (
+                                <span className="nav-file__name">
+                                  {a.favorite ? '★ ' : ''}
+                                  {a.title}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                className="nav-file__del"
+                                title="删除"
+                                aria-label={`删除 ${a.title}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setConfirmFileDel(a.id)
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                            {confirmFileDel === a.id ? (
+                              <div className="algo-item__confirm">
+                                <span>删除「{a.title}」？</span>
+                                <Button size="sm" variant="danger" onClick={() => void handleDelete(a.id).then(() => setConfirmFileDel(null))}>删除</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setConfirmFileDel(null)}>取消</Button>
+                              </div>
+                            ) : null}
+                            {bulkMode ? (
+                              <label className="nav-file__bulk">
+                                <input
+                                  type="checkbox"
+                                  checked={bulkIds.has(a.id)}
+                                  onChange={() => toggleBulk(a.id)}
+                                />
+                                选择
+                              </label>
+                            ) : null}
+                          </li>
+                        ))}
+                        {catItems.length === 0 ? <li className="algo-empty">空文件夹 — 右键或「新建文件」</li> : null}
+                      </ul>
+                    ) : null}
+                    {confirmFolderDel === cat ? (
+                      <div className="algo-item__confirm nav-folder-confirm">
+                        <span>删除文件夹「{cat}」？</span>
+                        <Button size="sm" variant="danger" onClick={() => void handleDeleteFolder(cat, false)}>仅解散</Button>
+                        <Button size="sm" variant="danger" onClick={() => void handleDeleteFolder(cat, true)}>连删算法</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmFolderDel(null)}>取消</Button>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+
+              <div className="nav-group nav-group--pseudo" role="none">
+                <div
+                  role="treeitem"
+                  aria-selected={navSel === '__fav'}
+                  className={`nav-cat nav-cat--pseudo${navSel === '__fav' ? ' is-active' : ''}`}
+                  onClick={() => {
+                    setNavSel('__fav')
+                    setTreeFocus({ kind: 'none' })
+                    toggleCat('__fav', true)
+                  }}
+                >
+                  <span className="nav-cat__icon" aria-hidden="true">★</span>
+                  <span className="nav-cat__name">收藏</span>
+                </div>
+                {navSel === '__fav' ? (
+                  <ul className="nav-kids" role="group">
+                    {favItems.map((a) => (
+                      <li key={a.id}>
+                        <div
+                          className={`nav-file${a.id === selectedId ? ' is-active' : ''}`}
+                          onClick={() => {
+                            setSelectedId(a.id)
+                            setTreeFocus({ kind: 'file', id: a.id, category: a.category || '其他' })
+                          }}
+                          onContextMenu={(e) => openCtx(e, 'file', a.category || '其他', a.id)}
+                        >
+                          <span className="nav-file__icon" aria-hidden="true">📄</span>
+                          <span className="nav-file__name">{a.title}</span>
+                        </div>
+                      </li>
+                    ))}
+                    {favItems.length === 0 ? <li className="algo-empty">暂无收藏算法</li> : null}
+                  </ul>
+                ) : null}
+              </div>
+
+              {categories.length === 0 ? (
+                <div className="algo-empty">{query.trim() ? '没有匹配的算法' : '右键空白区或点「新建文件夹」'}</div>
               ) : null}
-            </ul>
-            <div className="algo-lab__nav-foot">数据保存在本机，可导出备份</div>
+            </div>
+
+            <div className="algo-lab__nav-dock">
+              <div className="nav-lang" role="radiogroup" aria-label="语言">
+                <span className="nav-lang__label" aria-hidden="true">★</span>
+                {LANG_SHORT.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={lang === opt.value}
+                    className={`nav-lang__btn${lang === opt.value ? ' is-active' : ''}`}
+                    title={opt.title}
+                    onClick={() => setLang(opt.value)}
+                  >
+                    {opt.short}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {ctxMenu ? (
+              <div
+                ref={ctxRef}
+                className="ctx-menu"
+                role="menu"
+                style={{ left: Math.min(ctxMenu.x, window.innerWidth - 180), top: Math.min(ctxMenu.y, window.innerHeight - 200) }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {ctxMenu.target !== 'file' && (
+                  <button type="button" role="menuitem" onClick={() => { void handleNewFileIn(ctxMenu.category); setCtxMenu(null) }}>
+                    新建文件
+                  </button>
+                )}
+                {ctxMenu.target !== 'file' && (
+                  <button type="button" role="menuitem" onClick={() => { void handleNewFolder(); setCtxMenu(null) }}>
+                    新建文件夹
+                  </button>
+                )}
+                {ctxMenu.target === 'file' && (
+                  <button type="button" role="menuitem" onClick={() => { void handleNewFileIn(ctxMenu.category); setCtxMenu(null) }}>
+                    在父文件夹新建
+                  </button>
+                )}
+                <hr className="nav-more__sep" />
+                {ctxMenu.target === 'folder' ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setRenameState({ kind: 'folder', key: ctxMenu.category!, value: ctxMenu.category! })
+                      setCtxMenu(null)
+                    }}
+                  >
+                    重命名
+                  </button>
+                ) : null}
+                {ctxMenu.target === 'file' ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      const a = items.find((x) => x.id === ctxMenu.algoId)
+                      if (a) setRenameState({ kind: 'file', key: a.id, value: a.title })
+                      setCtxMenu(null)
+                    }}
+                  >
+                    重命名
+                  </button>
+                ) : null}
+                {ctxMenu.target === 'folder' ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="ctx-menu__danger"
+                    onClick={() => {
+                      setConfirmFolderDel(ctxMenu.category!)
+                      setCtxMenu(null)
+                    }}
+                  >
+                    删除
+                  </button>
+                ) : null}
+                {ctxMenu.target === 'file' ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="ctx-menu__danger"
+                    onClick={() => {
+                      setConfirmFileDel(ctxMenu.algoId!)
+                      setCtxMenu(null)
+                    }}
+                  >
+                    删除
+                  </button>
+                ) : null}
+                {ctxMenu.target === 'blank' ? (
+                  <>
+                    <hr className="nav-more__sep" />
+                    <button type="button" role="menuitem" onClick={() => { setCtxMenu(null); fileInputRef.current?.click() }}>导入 …</button>
+                    <button type="button" role="menuitem" onClick={() => { setCtxMenu(null); void handleExport() }}>导出 …</button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </aside>
         )}
 
@@ -927,21 +1412,21 @@ export function AlgorithmsLabPage() {
           right={
             <>
               {total > 0 && (
-                <span className="viz-step-badge">
-                  <span className="viz-step-badge__dot" aria-hidden="true" />
+                <span className="viz-step-info" title="回放步骤">
                   {Math.min(cursor, total)} / {total}
                 </span>
               )}
-              {activeLine != null && <span className="viz-step-line">行 {activeLine}</span>}
+              {activeLine != null && (
+                <span className="viz-step-info viz-step-info--muted" title="当前源码行">
+                  行 {activeLine}
+                </span>
+              )}
               <SelectMenu
                 ariaLabel="布局预设"
                 items={LAYOUT_ITEMS}
                 value={preset}
                 onChange={(p) => applyPreset(p)}
               />
-              <IconButton label="重置布局" onClick={() => applyPreset('default')}>
-                <Icon name="settings" size={16} />
-              </IconButton>
             </>
           }
         />
@@ -990,17 +1475,25 @@ export function AlgorithmsLabPage() {
           )}
         </div>
 
-        {tracers.length > 0 && (
-          <VizStatsPanel
-            tracers={tracers}
-            cursor={cursor}
-            total={total}
-            playing={playing}
-            building={building}
-          />
-        )}
+        {/* 统计信息并入底部「统计」Tab，不再使用浮动窗口 */}
 
-        <div className="viz-logsec">
+        <ResizeHandle
+          label="调整日志区高度"
+          className="algo-lab__split algo-lab__split--y"
+          axis="y"
+          onStart={() => {
+            logStart.current = logH
+          }}
+          onDrag={(delta) => {
+            if (logCollapsed) return
+            setLogH(clamp(logStart.current - delta, 80, 360))
+          }}
+        />
+
+        <div
+          className={`viz-logsec${logCollapsed ? ' is-collapsed' : ''}`}
+          style={{ height: logCollapsed ? 34 : logH } as CSSProperties}
+        >
           <div className="viz-logsec__bar">
             <div className="viz-logsec__tabs" role="tablist" aria-label="日志与统计">
               <button
@@ -1008,7 +1501,10 @@ export function AlgorithmsLabPage() {
                 role="tab"
                 aria-selected={logTab === 'log'}
                 className={`viz-logsec__tab${logTab === 'log' ? ' is-active' : ''}`}
-                onClick={() => setLogTab('log')}
+                onClick={() => {
+                  setLogCollapsed(false)
+                  setLogTab('log')
+                }}
               >
                 日志
               </button>
@@ -1017,25 +1513,45 @@ export function AlgorithmsLabPage() {
                 role="tab"
                 aria-selected={logTab === 'stats'}
                 className={`viz-logsec__tab${logTab === 'stats' ? ' is-active' : ''}`}
-                onClick={() => setLogTab('stats')}
+                onClick={() => {
+                  setLogCollapsed(false)
+                  setLogTab('stats')
+                }}
               >
                 统计
               </button>
             </div>
-            <Switch checked={autoScroll} onChange={setAutoScroll} label="自动滚动" />
+            <span className="viz-logsec__spacer" />
+            {!logCollapsed ? (
+              <Switch checked={autoScroll} onChange={setAutoScroll} label="自动滚动" />
+            ) : null}
+            <IconButton
+              label={logCollapsed ? '展开日志区' : '收起日志区'}
+              title={logCollapsed ? '展开日志区' : '收起日志区'}
+              onClick={() => setLogCollapsed(!logCollapsed)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                {logCollapsed ? (
+                  <path d="M6 14l6-6 6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                ) : (
+                  <path d="M6 10l6 6 6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+              </svg>
+            </IconButton>
           </div>
-          {logTab === 'log' ? (
-            <div className="viz-logsec__body" ref={logBodyRef}>
-              {logTracers.length === 0 ? (
-                <div className="viz-logsec__empty">
-                  暂无日志 — 在代码中使用 LogTracer.println() 输出
-                </div>
-              ) : (
-                logTracers.map((t) => <TracerPanel key={t.key} state={t} />)
-              )}
-            </div>
-          ) : (
-            <div className="viz-logsec__body viz-logsec__stats">
+          {!logCollapsed ? (
+            logTab === 'log' ? (
+              <div className="viz-logsec__body" ref={logBodyRef}>
+                {logTracers.length === 0 ? (
+                  <div className="viz-logsec__empty">
+                    暂无日志 — 在代码中使用 LogTracer.println() 输出
+                  </div>
+                ) : (
+                  logTracers.map((t) => <TracerPanel key={t.key} state={t} />)
+                )}
+              </div>
+            ) : (
+              <div className="viz-logsec__body viz-logsec__stats">
               <div className="viz-stat">
                 <span className="viz-stat__label">播放进度</span>
                 <span className="viz-stat__value">
@@ -1055,7 +1571,8 @@ export function AlgorithmsLabPage() {
                 <span className="viz-stat__value">{speed}×</span>
               </div>
             </div>
-          )}
+            )
+          ) : null}
         </div>
 
         <PlayerBar
@@ -1095,12 +1612,17 @@ export function AlgorithmsLabPage() {
         <aside className="panel panel-rail panel-rail--code" aria-label="代码面板已折叠">
           <IconButton
             label="展开代码面板"
+            title="展开代码面板"
             onClick={() => {
               setCodeCollapsed(false)
               markCustom()
             }}
           >
-            <Icon name="code" size={18} />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M15 4v16" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M11 10L8.5 12 11 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </IconButton>
         </aside>
       ) : (
@@ -1162,20 +1684,18 @@ export function AlgorithmsLabPage() {
                 disabled={!selected}
                 onClick={() => {
                   if (!selected) return
-                  setAiAutoAsk(
-                    `请解释算法「${selected.title}」的思路、时间/空间复杂度，并指出可改进点。`,
-                  )
                   setAiOpen(true)
                 }}
               >
                 <Icon name="message" size={18} />
               </IconButton>
-              <IconButton
-                label="生成可视化代码"
-                busy={converting}
-                disabled={!selected || converting}
-                onClick={() => void silentVisualize()}
-              >
+                <IconButton
+                  label={selected?.vizCode ? '重新生成可视化' : '生成可视化代码'}
+                  title={selected?.vizCode ? '已可视化，点击可重新生成' : '生成可视化代码'}
+                  busy={converting}
+                  disabled={!selected || converting}
+                  onClick={() => void silentVisualize()}
+                >
                 <Icon name="wand" size={18} />
               </IconButton>
             </div>
@@ -1193,46 +1713,7 @@ export function AlgorithmsLabPage() {
                   : '可视化代码将直接用于运行'}
             </span>
           </div>
-          <div style={{ padding: '0 12px 8px' }}>
-            <Disclosure label="元信息" defaultOpen={false}>
-              <label className="algo-field">
-                <span>描述</span>
-                <input
-                  value={desc}
-                  onChange={(e) => {
-                    setDesc(e.target.value)
-                    setDirty(true)
-                  }}
-                  disabled={!selected}
-                />
-              </label>
-              <label className="algo-field">
-                <span>分类</span>
-                <input
-                  value={selected?.category ?? ''}
-                  onChange={(e) => {
-                    void persistSelected({ category: e.target.value || '其他' })
-                  }}
-                  disabled={!selected || selected.source === 'builtin'}
-                  title={selected?.source === 'builtin' ? '内置算法请先「另存为」再改分类' : undefined}
-                />
-              </label>
-              <label className="algo-field">
-                <span>标签（逗号分隔）</span>
-                <input
-                  value={(selected?.tags ?? []).join(', ')}
-                  onChange={(e) => {
-                    const tags = e.target.value
-                      .split(/[,，]/)
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                    void persistSelected({ tags })
-                  }}
-                  disabled={!selected || selected.source === 'builtin'}
-                />
-              </label>
-            </Disclosure>
-          </div>
+          {/* 元信息已移除：描述/分类/标签改由文件树与右键管理 */}
           <div className="algo-lab__editor-body">
             <CodeEditor
               value={(() => {
@@ -1289,7 +1770,7 @@ export function AlgorithmsLabPage() {
         open={aiOpen}
         onClose={() => {
           setAiOpen(false)
-          setAiAutoAsk(undefined)
+          setAiOpen(false)
         }}
         title={selected ? `算法 · ${selected.title}` : '算法 AI'}
         systemPrompt={[
@@ -1306,7 +1787,7 @@ export function AlgorithmsLabPage() {
         ]
           .filter(Boolean)
           .join('\n\n')}
-        autoAsk={aiAutoAsk}
+        autoAsk={undefined}
       />
     </div>
   )

@@ -19,7 +19,7 @@ export interface VizValidateResult {
 }
 
 const TRACER_NAMES =
-  'Array1DTracer|Array2DTracer|LogTracer|GraphTracer|TreeTracer|StackTracer|QueueTracer|LinkedListTracer|CircularQueueTracer|DequeTracer|RedBlackTreeTracer|BPlusTreeTracer|StaticLinkedListTracer|ChartTracer|ScatterTracer'
+  'Array1DTracer|Array2DTracer|LogTracer|GraphTracer|TreeTracer|StackTracer|QueueTracer|LinkedListTracer|CircularQueueTracer|DequeTracer|RedBlackTreeTracer|BPlusTreeTracer|StaticLinkedListTracer|ChartTracer|ScatterTracer|MarkdownTracer'
 
 const TRACER_JS_RE = new RegExp(`\\bnew\\s+(${TRACER_NAMES})\\s*\\(`)
 

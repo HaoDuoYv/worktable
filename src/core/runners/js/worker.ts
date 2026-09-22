@@ -9,9 +9,12 @@ type RunPayload = { code: string }
 
 self.onmessage = async (event: MessageEvent<RunPayload>) => {
   try {
-    const imported = await import('algorithm-visualizer')
-    // Official package has no Tree/Stack/Queue/LinkedList — polyfill from Graph/Array-like bases.
-    const AlgorithmVisualizer: Record<string, unknown> = { ...(imported as object) }
+    const ns = (await import('algorithm-visualizer')) as Record<string, unknown> & {
+      default?: Record<string, unknown>
+    }
+    // 必须整包使用同一套 API（default 或 named 二选一），否则 Commander 记录会分裂
+    const api = ns.default && typeof ns.default.Array1DTracer === 'function' ? ns.default : ns
+    const AlgorithmVisualizer: Record<string, unknown> = { ...api }
     if (typeof AlgorithmVisualizer.TreeTracer !== 'function') {
       const GraphTracer = AlgorithmVisualizer.GraphTracer as new (title?: string) => object
       class TreeTracer extends GraphTracer {}
@@ -187,7 +190,16 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
 
     const commands = (AlgorithmVisualizer.Commander as unknown as { commands: AvCommand[] })
       .commands
-    self.postMessage({ ok: true, commands: commands ?? [] })
+    const list = commands ?? []
+    if (list.length === 0) {
+      throw new Error(
+        '未记录到可视化命令 keys=' +
+          Object.keys(AlgorithmVisualizer).slice(0, 24).join(',') +
+          ' hasCtor=' +
+          typeof AlgorithmVisualizer.Array1DTracer,
+      )
+    }
+    self.postMessage({ ok: true, commands: list })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     self.postMessage({ ok: false, error: message })

@@ -1,4 +1,4 @@
-﻿// Smoke test: 算法实验室新布局（面板系统 / 可视化重排 / 移动端适配）
+// Smoke test: 算法实验室新布局（面板系统 / 可视化重排 / 移动端适配）
 // 运行: node scripts/verify-algolab.mjs [baseURL]
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -47,7 +47,7 @@ async function main() {
   // 2. 选中数组类算法并运行 → 画布 + 日志 + 变量
   await page.locator('.algo-search').fill('冒泡')
   await page.waitForTimeout(300)
-  await page.locator('.algo-item__main').first().click()
+  await page.locator('.nav-file').first().click()
   await page.waitForTimeout(300)
   await page.getByRole('button', { name: '运行', exact: true }).click()
   await page.waitForTimeout(3000)
@@ -58,7 +58,7 @@ async function main() {
   )
   check('画布包含非日志可视化面板', (await page.locator('.algo-lab__canvas .viz-panel').count()) > 0)
   check('日志区出现日志文本', (await page.locator('.viz-logsec__body pre.viz-log').count()) > 0)
-  check('步数胶囊出现', await page.locator('.viz-step-badge').isVisible())
+  check('步数信息出现', await page.locator('.viz-step-info').first().isVisible())
   check('日志区有内容或空态提示', await page.locator('.viz-logsec__body').isVisible())
   await page.locator('.algo-search').fill('')
 
@@ -85,7 +85,8 @@ async function main() {
   await page.getByText('专注可视化').click()
   await page.waitForTimeout(300)
   check('预设「专注可视化」两侧折叠', (await page.locator('.panel-rail').count()) === 2)
-  await page.getByRole('button', { name: '重置布局' }).click()
+  await page.locator('.algo-lab__viz .select-menu__trigger').click()
+  await page.getByText('默认布局').click()
   await page.waitForTimeout(300)
   check('重置布局后三面板恢复', (await page.locator('.panel-chrome').count()) === 3)
 
@@ -104,17 +105,38 @@ async function main() {
     `${Math.round(navBefore.width)}px → ${Math.round(navAfter.width)}px`,
   )
 
-  // 8. 算法库功能：搜索 / 多选按钮
+  // 8. 算法库功能：搜索 / VS Code 工具栏 / 右键 / 更多
   await page.locator('.algo-search').fill('冒泡')
   await page.waitForTimeout(300)
-  check('算法库搜索过滤', (await page.locator('.algo-item').count()) >= 1)
+  check('算法库搜索过滤', (await page.locator('.nav-file').count()) >= 1)
   await page.locator('.algo-search').fill('')
-  check('多选按钮存在', await page.getByRole('button', { name: '多选' }).isVisible())
+  check('分类文件夹存在', (await page.locator('.nav-cat').count()) >= 1)
+  check('新建文件夹图标存在', await page.getByRole('button', { name: '新建文件夹', exact: true }).isVisible())
+  check('新建文件图标存在', await page.getByRole('button', { name: '新建文件', exact: true }).isVisible())
+  check('底栏语言开关存在', await page.locator('.nav-lang').isVisible())
+  await page.getByRole('button', { name: '更多' }).click()
+  check('更多含导入', await page.getByRole('menuitem', { name: /导入/ }).isVisible())
+  check('更多含导出', await page.getByRole('menuitem', { name: /导出/ }).isVisible())
+  check('更多含多选', await page.getByRole('menuitem', { name: /多选/ }).isVisible())
+  await page.getByRole('menuitem', { name: /多选/ }).click()
+  check('多选进入后出现退出多选', await page.getByRole('button', { name: '退出多选' }).isVisible())
+  await page.getByRole('button', { name: '退出多选' }).click()
+  // right-click folder → context menu
+  await page.locator('.nav-cat').first().click({ button: 'right' })
+  check('右键文件夹菜单出现', await page.locator('.ctx-menu').isVisible())
+  check('右键含新建文件', await page.getByRole('menuitem', { name: '新建文件', exact: true }).isVisible())
+  check('右键含重命名', await page.getByRole('menuitem', { name: '重命名' }).isVisible())
+  await page.keyboard.press('Escape')
+  await page.mouse.click(400, 400)
 
   // 9. 代码面板操作按钮齐全
-  for (const label of ['保存', '另存为副本', 'AI 问答', '生成可视化代码']) {
+  for (const label of ['保存', '另存为副本', 'AI 问答']) {
     check(`代码面板操作「${label}」存在`, await page.getByRole('button', { name: label }).isVisible())
   }
+  check(
+    '代码面板操作「生成可视化」存在',
+    (await page.locator('button[aria-label*="可视化"]').count()) >= 1,
+  )
 
   // 10. 移动端 390px：分段切换
   const mob = await browser.newPage({ viewport: { width: 390, height: 844 } })

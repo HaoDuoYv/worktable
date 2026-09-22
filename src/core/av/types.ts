@@ -23,6 +23,9 @@ export type TracerKind =
   | 'RedBlackTreeTracer'
   | 'BPlusTreeTracer'
   | 'StaticLinkedListTracer'
+  | 'ChartTracer'
+  | 'MarkdownTracer'
+  | 'ScatterTracer'
   | 'unknown'
 
 export interface CellState {
@@ -70,6 +73,12 @@ export interface TracerViewState {
   tail?: number
   /** static linked list: second row is next-index */
   isStaticList?: boolean
+  /** graph weighted display (AV GraphTracer.weighted) */
+  isWeighted?: boolean
+  /** graph layout mode: circle | tree | random */
+  layout?: 'circle' | 'tree' | 'random' | null
+  /** MarkdownTracer body */
+  markdown?: string
 }
 
 export function buildChunks(commands: AvCommand[]): AvChunk[] {

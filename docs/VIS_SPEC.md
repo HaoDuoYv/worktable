@@ -1,6 +1,6 @@
 # Worktable 可视化代码规范（VIS_SPEC）
 
-> 版本：v1.4 · 对齐 `src/core/av/` 命令回放引擎  
+> 版本：v1.5 · 对齐 `src/core/av/` 命令回放引擎 + 官方 algorithm-visualizer 能力面  
 > AI 生成 / 人工编写可视化代码，**必须**满足本规范；转换后由 `validateVizCode` 静态校验。
 >
 > **配套文档**：`docs/VIS_ANIMATION_SPEC.md`（动效语义 + 统计窗口规范）。本文件规定「命令协议与代码写法」，动效层规定「这些命令在画布上如何被动画呈现」。
@@ -66,9 +66,9 @@
 |------------------|----------|------------------------------------------|
 | `Array1DTracer` | **数值数组 → 柱状图**；否则等大单元格 | 写入弹入 / 比较扫描 / 交换 |
 | `Array2DTracer` | 二维表格 | 单元格 patch |
-| `LogTracer` | 日志流（不占画布主区） | 逐行追加 |
-| `GraphTracer` | SVG 节点 + 边 | 遍历涟漪 / 访问变色 |
-| `TreeTracer` | SVG 节点 + 有向边 | 插入弹入 / 遍历涟漪 |
+| `LogTracer` | 日志流（不占画布主区） | 逐行追加；支持 `printf` |
+| `GraphTracer` | SVG 节点 + 边（可 weighted / pan-zoom） | 遍历涟漪 / 访问变色 / 布局切换 |
+| `TreeTracer` | SVG 节点 + 有向边（层级树布局） | 插入弹入 / 遍历涟漪 |
 | `StackTracer` | 纵向单元格（top/bottom） | push 顶部弹入 / pop 收缩 |
 | `QueueTracer` | 横向单元格（front/back） | enqueue 右弹入 / dequeue 左收缩 |
 | `LinkedListTracer` | 节点 + `→` 箭头 | 断链重连 / 逐个涟漪 |
@@ -77,6 +77,9 @@
 | `RedBlackTreeTracer` | 红/黑着色树 | 旋转位移 / 颜色过渡 |
 | `BPlusTreeTracer` | 内部节点 + 叶层链表 | split 分裂 / 键上浮 |
 | `StaticLinkedListTracer` | `data`/`next` 双行表 | 指针跳转 / 写入闪光 |
+| `ChartTracer` | **柱状图**（与数值 Array1D 同语义） | 同 Array1D 柱状图；可由 `array1d.chart(chart)` 同步 |
+| `ScatterTracer` | 二维散点（每行 `[x,y]`） | 点选中/写入变色 |
+| `MarkdownTracer` | 说明文本面板 | 无结构动画 |
 | `unknown`（未注册类名） | 通用兜底视图 | 无 |
 
 > ⚠️ **引擎没有 `BTreeTracer`**——传入未注册类名会落到 `unknown` 兜底视图。B 树请用 `TreeTracer`（或 `GraphTracer`）呈现，节点 label 形如 `"10|20"`。详见 §3.3。
@@ -142,9 +145,14 @@ const {
 **GraphTracer / TreeTracer**
 
 - `set(adjacencyMatrix)`（Tree 用父→子边；无父节点为根）
-- `directed(bool)`
+- `directed(bool)` / **`weighted(bool)`**（边权/点权显示，对齐官方 AV）
+- **布局**：`layoutCircle()` / `layoutTree(root?, sorted?)` / `layoutRandom()`  
+  - `layoutTree` 为叶节点水平打包的层级布局（移植自 AV GraphTracer），树/层次图优先调用
+- 增量结构：`addNode(id, weight?, x?, y?)` / `updateNode` / `removeNode`；`addEdge(s,t,w?)` / `updateEdge` / `removeEdge`
 - `visit(target, source?, weight?)` / `leave(...)`
 - `select(target, source?)` / `deselect(...)`
+- **`log(logTracer)`**：visit/select 自动向 LogTracer 写 `a -> b` / `a => b`（AV 同款）
+- 画布支持滚轮缩放 + 拖拽平移
 
 > **B 树的表达方式**：引擎**没有** `BTreeTracer`，B 树以 `TreeTracer`（或 `GraphTracer`）呈现即可。约定：
 > - 一个「多键节点」= 一个树节点，`label` 用 `|` 分隔键，如 `"10|20|30"`；
@@ -155,12 +163,26 @@ const {
 
 **LogTracer**
 
-- `set(log?)` / `print(msg)` / `println(msg)`
+- `set(log?)` / `print(msg)` / `println(msg)` / **`printf(format, ...args)`**（`%s` `%d` `%f`）
 - **变量观察**：界面上方「变量条」会从日志中解析 `name = value`（如 `i=3`、`A[0]=5`）。
   生成/编写可视化代码时，关键变量请用 `println` 输出 `标识符=值` 形式，便于步骤回放时观察。
 - **操作计数**：画布上的**统计浮动窗口**同样从日志文本中按关键词计数操作次数——
   插入、删除、查找、比较、交换、遍历（中/英文均可，见 §3.4 表）。
   **若日志里没有这些词，统计窗口的「操作次数」将恒为 0。**
+
+**ChartTracer / Array1DTracer.chart**
+
+- `chart.set(纯数字数组)` 直接画柱状图
+- 或 `array1d.set(nums); array1d.chart(chartTracer)` — Array1D 数据同步到 ChartTracer（AV 协议）
+- 排序/统计类推荐：主视图 Array1D（单元格或柱）+ 可选 Chart 对照
+
+**ScatterTracer**
+
+- `set([[x,y], ...])` 每行两点；`select`/`patch` 对应单元格状态
+
+**MarkdownTracer**
+
+- `set(markdownString)` / `println(line)` — 算法说明、步骤摘要
 
 **StackTracer（栈，LIFO）**
 
@@ -510,6 +532,15 @@ interface VizValidateResult {
 ---
 
 ## 8. AI 生成提示词要求（摘要）
+
+**产品侧约束（与提示词/UI 一并遵守）**
+
+| 项 | 行为 |
+|----|------|
+| AI 问答 | **仅用户主动输入后发送**，打开面板不自动提问 |
+| 生成可视化 | **互斥**：进行中不可再次点击；已有 `vizCode` 时需确认覆盖；生成中 busy |
+| 新建算法 | **空文件**，不注入示例骨架 |
+| 编辑保存 | 改动后**防抖自动保存** |
 
 模型输出必须：
 

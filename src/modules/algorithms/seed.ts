@@ -27,15 +27,24 @@ export function builtinToAlgorithm(
   }
 }
 
-/** Ensure built-in algorithms exist in IndexedDB (idempotent). */
+/** Ensure built-in algorithms exist and match shipped sample code. */
 export async function seedBuiltinAlgorithms(): Promise<Algorithm[]> {
   const existing = await listAlgorithms()
-  const ids = new Set(existing.map((a) => a.id))
-  const missing = BUILTIN_ALGORITHMS.filter((b) => !ids.has(b.id)).map((b) =>
-    builtinToAlgorithm(b),
-  )
-  for (const m of missing) {
-    await saveAlgorithm(m)
+  const byId = new Map(existing.map((a) => [a.id, a]))
+  for (const b of BUILTIN_ALGORITHMS) {
+    const prev = byId.get(b.id)
+    if (!prev) {
+      await saveAlgorithm(builtinToAlgorithm(b))
+      continue
+    }
+    const cur = prev.vizCode ?? prev.files[0]?.content ?? ''
+    if (prev.source === 'builtin' && cur !== b.code) {
+      await saveAlgorithm({
+        ...builtinToAlgorithm(b),
+        favorite: prev.favorite,
+        createdAt: prev.createdAt,
+      })
+    }
   }
   return listAlgorithms()
 }

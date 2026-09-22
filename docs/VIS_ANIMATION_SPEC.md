@@ -1,7 +1,8 @@
 # 数据结构可视化 —— 动画设计与统计窗口规范
 
-> 版本：v1.1 · 配套 `docs/VIS_SPEC.md`（命令协议 / 代码写法）与 `src/core/av/renderers.tsx`（渲染层）
+> 版本：v1.2 · 配套 `docs/VIS_SPEC.md`（命令协议 / 代码写法）与 `src/core/av/renderers.tsx`（渲染层）
 > 本文定义**视觉与动效层**：每种数据结构的操作动画语义 + 统计信息浮动窗口规范。
+> v1.2：对齐官方 algorithm-visualizer 的图布局 / 加权 / Chart·Scatter·Markdown / printf / log 同步能力。
 
 ---
 
@@ -106,11 +107,22 @@
 
 ### 3.6 树（TreeTracer / GraphTracer · 节点 + 父子边）
 
-- 形态：SVG 节点 + 有向边（父→子），根无父边。
+- 形态：SVG 节点 + 有向边（父→子），根无父边；**树类 Tracer 默认 `layoutTree` 层级布局**（AV 叶节点打包算法）。
 - **插入**：新节点**弹入**于父节点下方，父→子边**淡入**。
-- **删除**：节点**收缩淡出**，其边同时淡出，子树重连边淡入。
+- **删除**：节点**收缩淡出**，其边同时淡出，子树重连边淡入（`removeNode`/`removeEdge` 后自动 relayout）。
 - **查找**：沿比较路径**节点涟漪 + 边变亮**，命中节点**扫描高亮**定格。
 - **遍历**（前/中/后/层序）：访问节点**涟漪**、边标记 `is-visited`（青），清晰呈现遍历顺序。
+- **加权图**：`weighted(true)` 后边中点显示权重、节点旁显示点权；`visit(target, source, weight)` 更新点权。
+- **Graph.log(logTracer)**：visit/select 自动追加 `src -> dst` 日志，便于统计与源码对照。
+- **交互**：画布滚轮缩放、拖拽平移（对齐 AV GraphRenderer）。
+
+#### 布局命令对照（生成时选用）
+
+| 命令 | 效果 | 适用 |
+|------|------|------|
+| `layoutCircle()` | 节点均布圆周 | 稠密图、无明显层次 |
+| `layoutTree(root?)` | 层级树（叶节点水平均分） | 树、BFS/DFS 教学 |
+| `layoutRandom()` | 随机散点（最小间距） | 强调边连接而非层次 |
 
 ### 3.7 红黑树（RedBlackTreeTracer · 节点红/黑着色）
 
@@ -222,5 +234,6 @@
 |------|------|
 | v1.0 | 首版：9 类数据结构操作动画语义 + 统计浮动窗口规范；落地 `stats.ts`、`VizStatsPanel.tsx`、`algo-lab.css` 动画关键帧 |
 | **v1.1** | ①修正 §1.1：一维结构区分「**柱状图**（数值数组，柱高 ∝ 值）」与「等大单元格（含 null/字符串）」两种形态，明确排序类必须走柱状图；②新增 §3.10 **柱状图专项规格**（生长/比较/交换/写入/已排序区/响应式/无障碍）；③§4.1 补充**操作计数关键词表**与柱状图元素计数口径 |
+| **v1.2** | 对齐官方 AV：Graph `weighted` / `layoutCircle\|Tree\|Random` / 增量 `add/remove Node·Edge` / `log()` 自动日志；ChartTracer·ScatterTracer·MarkdownTracer；Log `printf`；`Array1D.chart` 同步；图缩放平移；树布局改用 AV 叶节点打包算法 |
 
-修改本规范时请同步：`src/core/av/stats.ts`、`src/core/av/renderers.tsx`、`src/components/VizStatsPanel.tsx`、`src/styles/algo-lab.css`、`docs/VIS_SPEC.md`。
+修改本规范时请同步：`src/core/av/stats.ts`、`src/core/av/renderers.tsx`、`src/components/VizStatsPanel.tsx`、`src/styles/algo-lab.css`、`docs/VIS_SPEC.md`、`src/modules/ai/aiClient.ts`。
