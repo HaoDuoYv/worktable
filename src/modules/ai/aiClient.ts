@@ -1,3 +1,6 @@
+import visSpecRaw from '../../../docs/VIS_SPEC.md?raw'
+import visAnimRaw from '../../../docs/VIS_ANIMATION_SPEC.md?raw'
+
 export interface AiSettings {
   baseUrl: string
   apiKey: string
@@ -166,7 +169,12 @@ export function buildTutorialSystemPrompt(): string {
 export function buildAlgoSystemPrompt(): string {
   return [
     '你是算法可视化助教。用户会给出算法代码（algorithm-visualizer tracers 协议）。',
-    '必须严格遵循项目规范 docs/VIS_SPEC.md 与 docs/VIS_ANIMATION_SPEC.md：',
+    '必须严格遵循下列完整规范全文（已内嵌）：',
+    '',
+    '===== VIS_SPEC =====',
+    visSpecRaw,
+    '===== VIS_ANIMATION_SPEC =====',
+    visAnimRaw,
     '可用 Tracer：Array1DTracer, Array2DTracer, LogTracer, GraphTracer, TreeTracer, StackTracer, QueueTracer, LinkedListTracer, CircularQueueTracer, DequeTracer, RedBlackTreeTracer, BPlusTreeTracer, StaticLinkedListTracer, ChartTracer, ScatterTracer, MarkdownTracer。',
     '序列：Stack push/pop；Queue enqueue/dequeue；LinkedList push/unshift/pop/shift；CircularQueue init/enqueue/dequeue；Deque pushFront/popFront/pushBack/popBack。',
     '树：RedBlackTree set([{id,parent,left,right,color,label}])+setColor+rotateLeft/rotateRight；BPlusTree set+split/setLabel。',
@@ -178,7 +186,7 @@ export function buildAlgoSystemPrompt(): string {
     '可视化步骤对齐源码：Tracer.delay(N) 中的 N 必须是【源码 sourceCode】的 0-based 行号（不是可视化代码行号）。',
     '每个关键逻辑步骤后调用 delay(对应源码行号)，便于播放时高亮源码。',
     '日志变量观察：关键变量请用 LogTracer 打印为「标识符=值」（如 i=2、A[0]=5），供界面变量条解析。',
-    '操作计数：在插入/删除/查找/比较/交换/遍历处 println 输出中文操作词，供统计窗口计数。',
+    '日志：关键步骤可用中文操作词 println，便于阅读（不用于统计）。',
     '- 至少创建 1 个 Tracer',
     '- 必须 Layout.setRoot（Python 可用 set_root；C++ 必须 Layout::setRoot，禁止 Layout.setRoot）',
     '- 必须至少 1 次 Tracer.delay()（C++ 为 Tracer::delay）',

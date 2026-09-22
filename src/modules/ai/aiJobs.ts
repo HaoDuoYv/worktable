@@ -36,6 +36,15 @@ export function hasRunningAiJob(): boolean {
   return [...jobs.values()].some((j) => j.status === 'running')
 }
 
+/** 全局是否已有「生成可视化」在跑（跨路由，防止重复点击） */
+export function hasRunningVizJob(): boolean {
+  return [...jobs.values()].some((j) => j.kind === 'viz' && j.status === 'running')
+}
+
+export function getRunningVizJob(): AiJob | null {
+  return [...jobs.values()].find((j) => j.kind === 'viz' && j.status === 'running') ?? null
+}
+
 function upsert(job: AiJob) {
   jobs.set(job.id, job)
   notify()

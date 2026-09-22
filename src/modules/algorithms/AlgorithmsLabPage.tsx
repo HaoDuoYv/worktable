@@ -25,6 +25,7 @@ import {
 } from '@/core/storage/indexedDb'
 import { InlineAiPanel } from '@/modules/ai/InlineAiPanel'
 import { startVizConvertJob } from '@/modules/ai/aiBackground'
+import { hasRunningVizJob, subscribeAiJobs } from '@/modules/ai/aiJobs'
 import {
   buildAlgoSystemPrompt,
   formatAlgorithmContext,
@@ -217,6 +218,8 @@ export function AlgorithmsLabPage() {
   const [editorMode, setEditorMode] = useState<'source' | 'viz'>('viz')
   const [aiOpen, setAiOpen] = useState(false)
   const [converting, setConverting] = useState(false)
+  // 跨路由同步「生成可视化」全局任务状态，防止切页后按钮可再点导致重复执行
+  useEffect(() => subscribeAiJobs(() => setConverting(hasRunningVizJob())), [])
   const [mobileTab, setMobileTab] = useState<'library' | 'viz' | 'code'>('viz')
   const [openCats, setOpenCats] = usePersistedJSON<Record<string, boolean>>('algolab.nav.open', {})
   const [moreOpen, setMoreOpen] = useState(false)
@@ -601,10 +604,10 @@ export function AlgorithmsLabPage() {
     [code, editorMode, selected],
   )
 
-  /** 生成可视化：互斥 + 已有结果时确认覆盖 */
+  /** 生成可视化：全局互斥；已有结果时确认覆盖 */
   const silentVisualize = useCallback(() => {
     if (!selected) return
-    if (converting) {
+    if (hasRunningVizJob() || converting) {
       showToast('正在生成可视化，请稍候')
       return
     }
@@ -630,13 +633,13 @@ export function AlgorithmsLabPage() {
       sourceCode: src,
       onApplied: (next) => {
         void listAlgorithms().then((all) => setItems(all))
-        setConverting(false)
         if (selectedId !== algoId) return
         setEditorMode('viz')
         setCode(next.vizCode ?? '')
         setDirty(false)
         showToast('已生成可视化代码并通过校验')
       },
+      onSettled: () => setConverting(false),
     })
   }, [code, converting, editorMode, selected, selectedId, showToast])
 
