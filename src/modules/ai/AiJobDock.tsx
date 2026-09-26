@@ -6,6 +6,7 @@ import { IconButton } from '@/components/IconButton'
 function labelOf(job: AiJob) {
   if (job.kind === 'viz') return '生成可视化'
   if (job.kind === 'chat') return 'AI 对话'
+  if (job.kind === 'news') return '每日新闻'
   return 'AI'
 }
 

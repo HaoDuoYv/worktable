@@ -92,6 +92,60 @@ function startStaticServer() {
     try {
       const url = new URL(req.url || '/', 'http://127.0.0.1')
       let pathname = decodeURIComponent(url.pathname)
+
+      // —— 新闻抓取代理：绕过渲染层 CORS，主进程 Node fetch ——
+      if (pathname === '/news/proxy') {
+        if (req.method !== 'POST') {
+          res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end('Method Not Allowed')
+          return
+        }
+        let body = ''
+        for await (const chunk of req) body += chunk
+        let payload
+        try {
+          payload = JSON.parse(body)
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end('Bad Request')
+          return
+        }
+        const target = payload && payload.url
+        if (typeof target !== 'string' || !/^https?:\/\//i.test(target)) {
+          res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end('Invalid url')
+          return
+        }
+        const headers =
+          payload && payload.headers && typeof payload.headers === 'object'
+            ? payload.headers
+            : {}
+        try {
+          const controller = new AbortController()
+          const timer = setTimeout(() => controller.abort(), 8000)
+          const r = await fetch(target, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+              ...headers,
+            },
+            redirect: 'follow',
+            signal: controller.signal,
+          })
+          clearTimeout(timer)
+          const buf = Buffer.from(await r.arrayBuffer())
+          res.writeHead(r.status, {
+            'Content-Type': r.headers.get('content-type') || 'application/octet-stream',
+            'Access-Control-Allow-Origin': '*',
+          })
+          res.end(buf)
+        } catch (e) {
+          res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end(e instanceof Error ? e.message : 'fetch failed')
+        }
+        return
+      }
+
       if (pathname.endsWith('/')) pathname += 'index.html'
 
       let filePath = path.normalize(path.join(root, pathname))

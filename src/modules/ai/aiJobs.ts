@@ -1,4 +1,4 @@
-export type AiJobKind = 'viz' | 'chat' | 'test'
+export type AiJobKind = 'viz' | 'chat' | 'test' | 'news'
 export type AiJobStatus = 'running' | 'done' | 'error'
 
 export interface AiJob {

@@ -5,6 +5,7 @@ export type IconName =
   | 'tutorials'
   | 'algorithms'
   | 'ai'
+  | 'news'
   | 'settings'
   | 'sun'
   | 'moon'
@@ -59,6 +60,13 @@ const PATHS: Record<IconName, ReactNode> = {
       d="M12 3.5 13.7 8.3 18.5 10 13.7 11.7 12 16.5 10.3 11.7 5.5 10 10.3 8.3 12 3.5Z"
       strokeLinejoin="round"
     />
+  ),
+  news: (
+    <>
+      <rect x="4" y="5" width="16" height="14" rx="1.5" />
+      <path d="M4 9.5h16" />
+      <path d="M7 13h6M7 16h4" />
+    </>
   ),
   settings: (
     <>

@@ -93,3 +93,6 @@ server.tar
 verify-result.json
 _git_*.txt
 release-new/
+
+# vite temp config
+vite.config.ts.timestamp-*.mjs

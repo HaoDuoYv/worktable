@@ -6,6 +6,7 @@ import { TutorialsPage } from '@/modules/tutorials/TutorialsPage'
 import { TutorialPlayerPage } from '@/modules/tutorials/TutorialPlayerPage'
 import { AlgorithmsLabPage } from '@/modules/algorithms/AlgorithmsLabPage'
 import { AiPage } from '@/modules/ai/AiPage'
+import { NewsPage } from '@/modules/news/NewsPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '@/modules/auth/AuthPages'
 
@@ -38,6 +39,11 @@ export const router = createBrowserRouter([
         path: 'ai',
         element: <AiPage />,
         handle: { title: 'AI', flush: true },
+      },
+      {
+        path: 'news',
+        element: <NewsPage />,
+        handle: { title: '新闻' },
       },
       {
         path: 'settings',

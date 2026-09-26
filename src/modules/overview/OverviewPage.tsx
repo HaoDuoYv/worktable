@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/Page'
+import { NewsCard } from '@/modules/news/NewsCard'
 
 function useGreeting() {
   const [greeting, setGreeting] = useState('你好')
@@ -82,6 +83,8 @@ export function OverviewPage() {
             </div>
           </div>
         </section>
+
+        <NewsCard />
 
         <div className="card-grid" style={{ marginBottom: 20 }}>
           <section className="panel">

@@ -135,6 +135,30 @@ export async function deleteAlgorithm(id: string): Promise<void> {
   await tx(STORE.algorithms, 'readwrite', (s) => s.delete(id) as unknown as IDBRequest<undefined>)
 }
 
+/* —— 通用 KV（供新闻缓存等按 key 存取） —— */
+
+interface KvRecord<T> {
+  key: string
+  value: T
+}
+
+export async function kvSet<T>(key: string, value: T): Promise<void> {
+  await tx(STORE.kv, 'readwrite', (s) => s.put({ key, value } as KvRecord<T>) as IDBRequest<IDBValidKey>)
+}
+
+export async function kvGet<T>(key: string): Promise<T | undefined> {
+  const rec = await tx<KvRecord<T> | undefined>(
+    STORE.kv,
+    'readonly',
+    (s) => s.get(key) as IDBRequest<KvRecord<T> | undefined>,
+  )
+  return rec?.value
+}
+
+export async function kvDelete(key: string): Promise<void> {
+  await tx(STORE.kv, 'readwrite', (s) => s.delete(key) as unknown as IDBRequest<undefined>)
+}
+
 export async function bulkPutAlgorithms(algos: Algorithm[]): Promise<void> {
   if (algos.length === 0) return
   await openDb().then(

@@ -17,6 +17,7 @@ const NAV_ITEMS: {
   { to: '/tutorials', label: '教程', icon: 'tutorials' },
   { to: '/algorithms', label: '算法', icon: 'algorithms' },
   { to: '/ai', label: 'AI', icon: 'ai' },
+  { to: '/news', label: '新闻', icon: 'news' },
   { to: '/settings', label: '设置', icon: 'settings' },
 ]
 
