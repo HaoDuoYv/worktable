@@ -46,15 +46,21 @@ function generate(date: string): Promise<NewsDigest> {
       run: async ({ update }) => {
         try {
           update('抓取新闻…')
-          const [ai, hot] = await Promise.all([fetchCategory('ai'), fetchCategory('hot')])
+          const [ai, hot, toutiao] = await Promise.all([
+            fetchCategory('ai'),
+            fetchCategory('hot'),
+            fetchCategory('toutiao'),
+          ])
 
-          const merged = [...ai.items, ...hot.items]
+          const merged = [...ai.items, ...hot.items, ...toutiao.items]
           if (merged.length === 0) throw new Error('所有数据源均不可用，请检查网络后重试')
 
+          // AI 摘要只整理 AI 新闻与社会热点；头条标题本身已是精炼热榜，不额外消耗配额
           update('AI 整理摘要…')
-          const items = await summarizeNews(merged)
+          const summarized = await summarizeNews([...ai.items, ...hot.items])
+          const items = [...summarized, ...toutiao.items]
 
-          const failed = [...ai.failedSources, ...hot.failedSources]
+          const failed = [...ai.failedSources, ...hot.failedSources, ...toutiao.failedSources]
           const digest: NewsDigest = {
             date,
             status: 'done',

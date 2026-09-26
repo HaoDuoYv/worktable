@@ -1,6 +1,6 @@
 /** 每日新闻 —— 数据模型 */
 
-export type NewsCategory = 'ai' | 'hot'
+export type NewsCategory = 'ai' | 'hot' | 'toutiao'
 
 export const CATEGORY_META: Record<
   NewsCategory,
@@ -8,6 +8,7 @@ export const CATEGORY_META: Record<
 > = {
   ai: { label: 'AI 新闻', hint: 'AI 与科技行业动态' },
   hot: { label: '社会热点', hint: '全网热议话题' },
+  toutiao: { label: '今日头条', hint: '头条热榜' },
 }
 
 export interface NewsItem {
@@ -21,6 +22,8 @@ export interface NewsItem {
   /** 来源名，如「36氪」「微博热搜」 */
   source: string
   category: NewsCategory
+  /** 热度值（热榜类源，如「482万」） */
+  heat?: string
 }
 
 export type NewsStatus = 'idle' | 'generating' | 'done' | 'error'

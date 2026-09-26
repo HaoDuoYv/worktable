@@ -27,6 +27,8 @@ export interface NewsSource {
   titlePath?: string[]
   /** JSON 源：每条目里链接字段的路径（缺省则无链接） */
   urlPath?: string[]
+  /** JSON 源：每条目里热度字段的路径（热榜类源，可选） */
+  heatPath?: (string | number)[]
   /** 最多保留条数 */
   limit?: number
 }
@@ -96,5 +98,20 @@ export const NEWS_SOURCES: NewsSource[] = [
     titlePath: ['word'],
     urlPath: ['url'],
     limit: 15,
+  },
+
+  // —— 今日头条（JSON 热榜，带热度值）——
+  {
+    id: 'toutiao',
+    name: '今日头条',
+    category: 'toutiao',
+    kind: 'json',
+    url: 'https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc',
+    headers: { Referer: 'https://www.toutiao.com/', 'User-Agent': UA },
+    itemPath: ['data'],
+    titlePath: ['Title'],
+    urlPath: ['Url'],
+    heatPath: ['HotValue'],
+    limit: 20,
   },
 ]

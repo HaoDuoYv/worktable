@@ -1,0 +1,520 @@
+/* 概览页 v2 —— 对齐画布重设计（问候行 / 统计条 / 双栏网格 / 天气与头条卡） */
+
+.ov-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.ov-head__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ov-head__eyebrow {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ov-head__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ov-head__actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* —— 统计条补充 —— */
+
+.stat-tile__sub {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.stat-tile__icon {
+  display: inline-flex;
+  margin-left: 6px;
+  color: var(--warn);
+  vertical-align: -2px;
+}
+
+.stat-tile__value.is-signal {
+  color: var(--signal);
+}
+
+.stat-tile__value.is-warn {
+  color: var(--warn);
+}
+
+.stat-tile__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.stat-tile__bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* —— 主体网格 —— */
+
+.ov-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+  margin-top: 20px;
+}
+
+.ov-col,
+.ov-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* —— 卡片通用 —— */
+
+.ov-card {
+  padding: 18px;
+}
+
+.ov-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ov-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ov-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.ov-link:hover {
+  text-decoration: underline;
+}
+
+.ov-muted {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.ov-muted a {
+  color: var(--accent);
+}
+
+.ov-chip {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.ov-footnote {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.ov-flame {
+  display: inline-flex;
+  color: var(--danger);
+}
+
+/* —— 继续学习 —— */
+
+.ov-learn__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ov-learn__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.ov-learn__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ov-learn__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ov-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  margin-top: 14px;
+  overflow: hidden;
+}
+
+.ov-progress__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* —— 最近算法 —— */
+
+.ov-alist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ov-alist__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.ov-alist__row:hover {
+  border-color: var(--line-strong);
+}
+
+.ov-alist__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-alist__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ov-lang {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--line);
+  color: var(--text-muted);
+}
+
+.ov-lang--javascript {
+  color: var(--warn);
+}
+
+.ov-lang--python {
+  color: var(--signal);
+}
+
+.ov-lang--cpp {
+  color: var(--danger);
+}
+
+/* —— AI 新闻速览 —— */
+
+.ov-digest {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ov-digest__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ov-digest__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.ov-digest__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-digest__title:hover {
+  color: var(--accent);
+}
+
+.ov-digest__src {
+  font-size: 11px;
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+/* —— 今日头条热榜 —— */
+
+.ov-hotlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  counter-reset: hot;
+}
+
+.ov-hotlist__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ov-hotlist__rank {
+  width: 16px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
+.ov-hotlist__rank.is-top {
+  color: var(--danger);
+}
+
+.ov-hotlist__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-hotlist__title:hover {
+  color: var(--accent);
+}
+
+.ov-hotlist__heat {
+  font-size: 11px;
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+/* —— 当日天气 —— */
+
+.ov-weather__main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ov-weather__icon {
+  display: inline-flex;
+  color: var(--warn);
+  flex-shrink: 0;
+}
+
+.ov-weather__temp {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.ov-weather__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.ov-weather__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: var(--panel-2);
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.ov-weather__k {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.ov-weather__v {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-weather__v.is-signal {
+  color: var(--signal);
+}
+
+/* —— 设置页：分组导航布局 —— */
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 20px;
+}
+
+.settings-nav__item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.settings-nav__item:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.settings-nav__item.is-active {
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.settings-content {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+  min-width: 0;
+}
+
+.settings-weather {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-field__label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-field__input {
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 10px;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 220px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.settings-field__input:focus-visible {
+  border-color: var(--focus);
+}
+
+.settings-saved {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--signal);
+}
+
+/* —— 窄屏适配 —— */
+
+@media (max-width: 960px) {
+  .ov-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

@@ -1,4 +1,4 @@
-import type { NewsItem } from './types'
+import type { NewsCategory, NewsItem } from './types'
 import { NEWS_SOURCES, type NewsSource } from './sources'
 
 /**
@@ -127,7 +127,15 @@ function resolvePath(obj: unknown, path: PathSeg[]): unknown {
   return cur
 }
 
-function parseJson(source: NewsSource, text: string): { title: string; url?: string }[] {
+/** 热度格式化：4820000 → 482万；980000 → 98万 */
+function formatHeat(raw: unknown): string | undefined {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return undefined
+  if (n >= 10000) return `${Math.round(n / 10000)}万`
+  return String(Math.round(n))
+}
+
+function parseJson(source: NewsSource, text: string): { title: string; url?: string; heat?: string }[] {
   const limit = source.limit ?? 15
   let data: unknown
   try {
@@ -137,13 +145,14 @@ function parseJson(source: NewsSource, text: string): { title: string; url?: str
   }
   const arr = resolvePath(data, source.itemPath ?? [])
   if (!Array.isArray(arr)) throw new Error('条目结构不符')
-  const out: { title: string; url?: string }[] = []
+  const out: { title: string; url?: string; heat?: string }[] = []
   for (const entry of arr) {
     if (out.length >= limit) break
     const title = String(resolvePath(entry, source.titlePath ?? []) ?? '').trim()
     if (!title) continue
     const url = source.urlPath ? String(resolvePath(entry, source.urlPath) ?? '').trim() : undefined
-    out.push({ title, url: url || undefined })
+    const heat = source.heatPath ? formatHeat(resolvePath(entry, source.heatPath)) : undefined
+    out.push({ title, url: url || undefined, heat })
   }
   if (out.length === 0) throw new Error('未提取到条目')
   return out
@@ -161,6 +170,7 @@ export async function fetchSource(source: NewsSource): Promise<NewsItem[]> {
     url: r.url,
     source: source.name,
     category: source.category,
+    heat: 'heat' in r ? (r.heat as string | undefined) : undefined,
   }))
 }
 
@@ -184,7 +194,7 @@ function dedupe(items: NewsItem[]): NewsItem[] {
   return out
 }
 
-export async function fetchCategory(category: 'ai' | 'hot'): Promise<FetchResult> {
+export async function fetchCategory(category: NewsCategory): Promise<FetchResult> {
   const sources = NEWS_SOURCES.filter((s) => s.category === category)
   const results = await Promise.allSettled(sources.map((s) => fetchSource(s)))
   const items: NewsItem[] = []

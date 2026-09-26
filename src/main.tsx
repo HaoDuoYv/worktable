@@ -8,6 +8,7 @@ import './styles/tutorial.css'
 import './styles/algo-lab.css'
 import './styles/select-menu.css'
 import './styles/news.css'
+import './styles/overview.css'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {
