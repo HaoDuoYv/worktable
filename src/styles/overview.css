@@ -501,6 +501,75 @@
   color: var(--signal);
 }
 
+/* —— 主题设置 —— */
+
+.theme-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-preset {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.theme-preset:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.theme-preset.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.theme-preset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.theme-preset__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.theme-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.theme-errors,
+.theme-warnings {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.theme-errors {
+  color: var(--danger);
+}
+
+.theme-warnings {
+  color: var(--warn);
+}
+
 /* —— 窄屏适配 —— */
 
 @media (max-width: 960px) {

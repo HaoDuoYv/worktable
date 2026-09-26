@@ -1,0 +1,66 @@
+/* 主题系统 —— 玻璃液态（Liquid Glass）与主题偏好附加样式
+ * 由 src/core/theme/themePrefs.ts 驱动：html[data-glass='on'] + --glass-blur/--glass-opacity。
+ */
+
+:root {
+  --glass-blur: 14px;
+  --glass-opacity: 0.72;
+}
+
+/* —— 玻璃开启时的底纹（让模糊「有东西可糊」） —— */
+html[data-glass='on'] body {
+  background:
+    radial-gradient(1200px 800px at 85% -10%, rgba(0, 122, 204, 0.22), transparent 60%),
+    radial-gradient(1000px 700px at -10% 110%, rgba(139, 92, 246, 0.18), transparent 55%),
+    var(--ink-950);
+  background-attachment: fixed;
+}
+
+html[data-glass='on'][data-theme='light'] body {
+  background:
+    radial-gradient(1200px 800px at 85% -10%, rgba(29, 78, 216, 0.1), transparent 60%),
+    radial-gradient(1000px 700px at -10% 110%, rgba(4, 120, 87, 0.08), transparent 55%),
+    var(--ink-950);
+  background-attachment: fixed;
+}
+
+/* —— 半透明 + 背景模糊的面 —— */
+html[data-glass='on'] .app-shell__nav,
+html[data-glass='on'] .panel,
+html[data-glass='on'] .stat-tile,
+html[data-glass='on'] .ov-card,
+html[data-glass='on'] .news-rail__card,
+html[data-glass='on'] .settings-nav__item.is-active,
+html[data-glass='on'] .app-shell__header {
+  background: color-mix(in srgb, var(--panel) calc(var(--glass-opacity) * 100%), transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+/* 内嵌块沿用更浅一级，保持层级可辨 */
+html[data-glass='on'] .ov-weather__cell,
+html[data-glass='on'] .ov-alist__row,
+html[data-glass='on'] .chip,
+html[data-glass='on'] .settings-field__input,
+html[data-glass='on'] .news-item {
+  background: color-mix(in srgb, var(--panel-2) calc(var(--glass-opacity) * 100% - 8%), transparent);
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.6));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.6));
+}
+
+/* backdrop-filter 不支持时的兜底：提高不透明度保证可读 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-glass='on'] .panel,
+  html[data-glass='on'] .stat-tile,
+  html[data-glass='on'] .ov-card,
+  html[data-glass='on'] .news-rail__card {
+    background: var(--panel);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass='on'] body {
+    background-attachment: scroll;
+  }
+}

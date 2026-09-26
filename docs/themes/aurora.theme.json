@@ -1,0 +1,38 @@
+{
+  "$schema": "worktable-theme/v1",
+  "meta": {
+    "name": "极光 Aurora",
+    "author": "worktable",
+    "version": "1.0.0",
+    "description": "深蓝夜色底 + 青紫极光点缀的玻璃暗色主题"
+  },
+  "base": "dark",
+  "colors": {
+    "ink-950": "#0d1220",
+    "ink-900": "#131a2c",
+    "ink-800": "#1a2340",
+    "ink-700": "#273254",
+    "line": "#273254",
+    "line-strong": "#3a4670",
+    "text": "#e6e9f5",
+    "text-muted": "#9aa3c0",
+    "text-subtle": "#626b8a",
+    "accent": "#22d3ee",
+    "accent-soft": "rgba(34, 211, 238, 0.16)",
+    "signal": "#a78bfa",
+    "signal-soft": "rgba(167, 139, 250, 0.16)",
+    "warn": "#fbbf24",
+    "danger": "#fb7185",
+    "focus": "#67e8f9",
+    "panel": "#131a2c",
+    "panel-2": "#1a2340",
+    "canvas": "#0a0f1c",
+    "elevated": "#1a2340"
+  },
+  "effects": {
+    "glass": true,
+    "glassBlur": 16,
+    "glassOpacity": 0.7
+  },
+  "radius": 10
+}

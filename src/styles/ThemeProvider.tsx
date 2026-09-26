@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { applyThemePrefs } from '@/core/theme/themePrefs'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -39,6 +40,8 @@ function systemPrefersDark(): boolean {
 function applyTheme(resolved: 'light' | 'dark') {
   document.documentElement.dataset.theme = resolved
   document.documentElement.style.colorScheme = resolved
+  // 外观模式变化后，主题色预设需按新模式重取色值
+  applyThemePrefs()
 }
 
 function farthestRadius(x: number, y: number): number {
