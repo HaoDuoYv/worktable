@@ -1499,6 +1499,7 @@ li.is-pending-delete .algo-item__del {
 .viz-edge {
   stroke: #5a6a80;
   stroke-width: 2;
+  fill: none;
 }
 
 .viz-edge.is-visited {
@@ -3181,6 +3182,119 @@ li.is-pending-delete .algo-item {
 .viz-edge.is-visited,
 .viz-edge.is-selected {
   transition: stroke var(--dur-fast) var(--ease-ui);
+}
+
+/* —— 树/图操作动画：插入 / 删除 / 交换 / 旋转 —— */
+
+.viz-node-pos {
+  transform-box: view-box;
+}
+
+.viz-node.is-born {
+  animation: viz-op-insert 240ms var(--ease-ui);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.viz-node.is-dying {
+  animation: viz-op-delete 300ms var(--ease-ui) forwards;
+  transform-origin: center;
+  transform-box: fill-box;
+  pointer-events: none;
+}
+
+.viz-node.is-dying .viz-node__circle {
+  stroke: var(--danger);
+  stroke-width: 2.5;
+}
+
+.viz-node.is-swap {
+  animation: viz-op-swap 420ms var(--ease-ui);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.viz-node.is-swap .viz-node__circle {
+  stroke: var(--signal);
+  stroke-width: 3;
+  animation: viz-flash-patch 420ms var(--ease-ui);
+}
+
+.viz-node.is-rotating .viz-node__circle {
+  stroke: var(--warn);
+  stroke-width: 3;
+}
+
+.viz-node.is-rotating {
+  animation: viz-op-traverse 480ms var(--ease-ui);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes viz-op-swap {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.viz-rot-arc__path {
+  fill: none;
+  stroke: var(--warn);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  animation: viz-arc-draw 500ms var(--ease-ui);
+}
+
+.viz-rot-arc__label {
+  fill: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+  animation: viz-fade-in 300ms var(--ease-ui);
+}
+
+.viz-swap-arc__path {
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 1.75;
+  stroke-dasharray: 5 4;
+  animation: viz-arc-draw 420ms var(--ease-ui);
+}
+
+.viz-swap-arc__label {
+  fill: var(--signal);
+  font-size: 14px;
+  font-weight: 700;
+  animation: viz-fade-in 300ms var(--ease-ui);
+}
+
+.viz-arrow.is-rot {
+  fill: var(--warn);
+}
+
+@keyframes viz-arc-draw {
+  from {
+    stroke-dashoffset: 48;
+    opacity: 0;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes viz-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* 移动端：统计窗口收拢为贴顶的紧凑横条 */

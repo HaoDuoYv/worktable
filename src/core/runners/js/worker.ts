@@ -21,6 +21,37 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
       Object.defineProperty(TreeTracer, 'name', { value: 'TreeTracer' })
       AlgorithmVisualizer.TreeTracer = TreeTracer
     }
+    // 树/图统一补齐旋转与交换命令（官方 GraphTracer 可能没有）
+    const treeProto = (AlgorithmVisualizer.TreeTracer as { prototype: Record<string, unknown> }).prototype
+    const graphProto = (AlgorithmVisualizer.GraphTracer as { prototype: Record<string, unknown> }).prototype
+    const ensureTreeOps = (proto: Record<string, unknown>) => {
+      const cmd = function (this: unknown, m: string, a: unknown[]) {
+        ;(this as { command: (m: string, a: unknown[]) => void }).command(m, a)
+        return this
+      }
+      if (typeof proto.rotateLeft !== 'function') {
+        proto.rotateLeft = function (this: unknown, x: number) {
+          return cmd.call(this, 'rotateLeft', [x])
+        }
+      }
+      if (typeof proto.rotateRight !== 'function') {
+        proto.rotateRight = function (this: unknown, x: number) {
+          return cmd.call(this, 'rotateRight', [x])
+        }
+      }
+      if (typeof proto.swap !== 'function') {
+        proto.swap = function (this: unknown, a: number, b: number) {
+          return cmd.call(this, 'swap', [a, b])
+        }
+      }
+      if (typeof proto.setPointer !== 'function') {
+        proto.setPointer = function (this: unknown, id: number, field: string, child: number | null) {
+          return cmd.call(this, 'setPointer', [id, field, child])
+        }
+      }
+    }
+    ensureTreeOps(treeProto)
+    ensureTreeOps(graphProto)
     const Array1DTracer = AlgorithmVisualizer.Array1DTracer as new (title?: string) => object
     const seqOps = {
       push(v: unknown) {
@@ -134,6 +165,10 @@ self.onmessage = async (event: MessageEvent<RunPayload>) => {
         }
         rotateRight(x: number) {
           ;(this as unknown as { command: (m: string, a: unknown[]) => void }).command('rotateRight', [x])
+          return this
+        }
+        swap(a: number, b: number) {
+          ;(this as unknown as { command: (m: string, a: unknown[]) => void }).command('swap', [a, b])
           return this
         }
         set(items: unknown[]) {

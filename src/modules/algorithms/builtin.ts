@@ -364,7 +364,7 @@ const log = new LogTracer('日志');
   {
     id: 'rb-tree-demo',
     title: '红黑树插入',
-    description: 'RedBlackTree 变色与旋转。',
+    description: 'RedBlackTree 变色、交换与旋转。',
     language: 'javascript',
     category: '树',
     tags: ['tree', 'rbtree'],
@@ -378,13 +378,21 @@ const log = new LogTracer('日志');
     { id: 5, parent: 10, left: null, right: null, color: 'red', label: '5' },
     { id: 15, parent: 10, left: null, right: null, color: 'red', label: '15' },
   ]);
-  log.println('visit 构造完成');
+  log.println('构造完成');
+  Tracer.delay();
+  t.addNode(20);
+  t.setPointer(15, 'right', 20);
+  t.setColor(20, 'red');
+  log.println('插入 20');
+  Tracer.delay();
+  t.swap(5, 15);
+  log.println('交换 5 ↔ 15');
   Tracer.delay();
   t.setColor(15, 'black');
-  log.println('插入 变色 15');
+  log.println('变色 15');
   Tracer.delay();
   t.rotateLeft(10);
-  log.println('交换 rotateLeft 10');
+  log.println('旋转 rotateLeft 10');
   Tracer.delay();
   log.println('完成');
   Tracer.delay();

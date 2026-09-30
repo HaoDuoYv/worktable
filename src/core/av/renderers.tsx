@@ -198,12 +198,30 @@ export function GraphView({ state }: { state: TracerViewState }) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const reduceMotion = useRef(false)
+  if (typeof window !== 'undefined' && !reduceMotion.current) {
+    reduceMotion.current = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  }
+  const posTransition = reduceMotion.current ? undefined : 'transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1)'
 
   const onWheel = (e: ReactWheelEvent<SVGSVGElement>) => {
     e.preventDefault()
     const next = e.deltaY > 0 ? zoom / 1.1 : zoom * 1.1
     setZoom(Math.max(0.4, Math.min(2.5, next)))
   }
+
+  const animClass = (anim: string | null | undefined): string => {
+    if (anim === 'born') return ' is-born'
+    if (anim === 'dying') return ' is-dying'
+    if (anim === 'swap') return ' is-swap'
+    if (anim === 'rotate') return ' is-rotating'
+    return ''
+  }
+
+  const swapA = state.swap ? nodePos.get(state.swap.a) : null
+  const swapB = state.swap ? nodePos.get(state.swap.b) : null
+  const rotPivot = state.rotate ? nodePos.get(state.rotate.pivot) : null
+  const rotLifted = state.rotate ? nodePos.get(state.rotate.lifted) : null
 
   return (
     <div className="viz-panel">
@@ -246,6 +264,9 @@ export function GraphView({ state }: { state: TracerViewState }) {
           <marker id="arrow-vis" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
             <path d="M0,0 L8,3 L0,6 z" className="viz-arrow is-visited" />
           </marker>
+          <marker id="arrow-rot" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 z" className="viz-arrow is-rot" />
+          </marker>
         </defs>
         <g transform={`translate(${c + pan.x},${c + pan.y}) scale(${zoom}) translate(${-c},${-c})`}>
           {edges.map((e, i) => {
@@ -279,13 +300,11 @@ export function GraphView({ state }: { state: TracerViewState }) {
             const my = (a.y + ey) / 2
             return (
               <g key={i}>
-                <line
-                  x1={a.x}
-                  y1={a.y}
-                  x2={ex}
-                  y2={ey}
+                <path
+                  d={`M${a.x},${a.y} L${ex},${ey}`}
                   className={cls}
                   markerEnd={marker}
+                  style={posTransition ? { transition: 'd 280ms cubic-bezier(0.2, 0.8, 0.2, 1)' } : undefined}
                 />
                 {isWeighted && e.weight != null ? (
                   <text x={mx} y={my - 6} className="viz-edge__weight" textAnchor="middle">
@@ -295,28 +314,77 @@ export function GraphView({ state }: { state: TracerViewState }) {
               </g>
             )
           })}
+
+          {/* 旋转弧线：支点 → 上提节点 */}
+          {state.rotate && rotPivot && rotLifted ? (
+            <g className="viz-rot-arc">
+              <path
+                d={`M${rotPivot.x},${rotPivot.y} Q${(rotPivot.x + rotLifted.x) / 2 + (state.rotate.dir === 'left' ? 28 : -28)},${(rotPivot.y + rotLifted.y) / 2 - 18} ${rotLifted.x},${rotLifted.y}`}
+                className="viz-rot-arc__path"
+                markerEnd="url(#arrow-rot)"
+              />
+              <text
+                x={(rotPivot.x + rotLifted.x) / 2 + (state.rotate.dir === 'left' ? 36 : -36)}
+                y={(rotPivot.y + rotLifted.y) / 2 - 10}
+                className="viz-rot-arc__label"
+                textAnchor="middle"
+              >
+                {state.rotate.dir === 'left' ? '左旋' : '右旋'}
+              </text>
+            </g>
+          ) : null}
+
+          {/* 交换弧线：两节点中点 ↔ */}
+          {state.swap && swapA && swapB ? (
+            <g className="viz-swap-arc">
+              <path
+                d={`M${swapA.x},${swapA.y} Q${(swapA.x + swapB.x) / 2},${(swapA.y + swapB.y) / 2 - 24} ${swapB.x},${swapB.y}`}
+                className="viz-swap-arc__path"
+              />
+              <text
+                x={(swapA.x + swapB.x) / 2}
+                y={(swapA.y + swapB.y) / 2 - 18}
+                className="viz-swap-arc__label"
+                textAnchor="middle"
+              >
+                ↔
+              </text>
+            </g>
+          ) : null}
+
           {nodes.map((n) => {
             const p = nodePos.get(n.id)
             if (!p) return null
             const colorCls = n.color === 'red' ? ' is-red' : n.color === 'black' ? ' is-black' : ''
-            const cls =
+            const base =
               n.selectedCount > 0
                 ? `viz-node is-selected${colorCls}`
                 : n.visitedCount > 0
                   ? `viz-node is-visited${colorCls}`
                   : `viz-node${colorCls}`
+            const cls = `${base}${animClass(n.anim)}`
             const label = n.label ?? String(n.id)
             return (
-              <g key={n.id} transform={`translate(${p.x},${p.y})`} className={cls}>
-                <circle r={nodeR} className="viz-node__circle" />
-                <text textAnchor="middle" dominantBaseline="central" className="viz-node__label">
-                  {label}
-                </text>
-                {isWeighted && n.weight != null && n.label == null ? (
-                  <text x={nodeR + 4} className="viz-node__weight" dominantBaseline="central">
-                    {String(n.weight)}
+              <g
+                key={n.id}
+                className="viz-node-pos"
+                style={
+                  reduceMotion.current
+                    ? { transform: `translate(${p.x}px, ${p.y}px)` }
+                    : { transform: `translate(${p.x}px, ${p.y}px)`, transition: posTransition }
+                }
+              >
+                <g className={cls}>
+                  <circle r={nodeR} className="viz-node__circle" />
+                  <text textAnchor="middle" dominantBaseline="central" className="viz-node__label">
+                    {label}
                   </text>
-                ) : null}
+                  {isWeighted && n.weight != null && n.label == null ? (
+                    <text x={nodeR + 4} className="viz-node__weight" dominantBaseline="central">
+                      {String(n.weight)}
+                    </text>
+                  ) : null}
+                </g>
               </g>
             )
           })}

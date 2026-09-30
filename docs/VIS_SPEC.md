@@ -53,7 +53,7 @@
 | `select` / `deselect` / `selectRow`… | 高亮 |
 | `print` / `println` | 日志 |
 | `visit` / `leave` | 图/树遍历 |
-| `rotateLeft` / `rotateRight` / `split` / `setPointer` / `setColor` / `setLabel` | 红黑树 / B+ 树 |
+| `rotateLeft` / `rotateRight` / `split` / `setPointer` / `setColor` / `setLabel` / `swap` | 红黑树 / B+ 树 |
 | `delay` | **必须**：步进点；**N=源码 0-based 行号**（用于回放高亮源码） |
 
 **没有 `delay` 则无法分步回放。**
@@ -212,7 +212,8 @@ const {
 - `set([{ id, parent, left?, right?, color: 'red'|'black', label? }])`
 - `setColor(id, 'red'|'black')` / `visit(id)` / `setLabel(id, text)`
 - `setPointer(id, 'left'|'right'|'parent', childId|null)`
-- `rotateLeft(x)` / `rotateRight(x)`（结构旋转，引擎维护边）
+- `rotateLeft(x)` / `rotateRight(x)`（结构旋转，引擎维护边 + 旋转弧线动画）
+- `swap(a, b)`（交换两节点标签/颜色，青色脉冲 + 弧线 ↔）
 
 **BPlusTreeTracer（B+ 树）**
 
@@ -250,7 +251,8 @@ const {
 | 插入新元素 | `push` / `enqueue` / `unshift` / `set` 后 `delay()` | 新单元**弹入**（`viz-op-insert`，scale 0.5→1.06→1） |
 | 删除元素 | `pop` / `dequeue` / `shift` 后 `delay()` | 被删单元**收缩淡出**（`viz-op-delete`，scale→0.3） |
 | 遍历 / 访问节点 | `visit(id)` → `delay()` → `leave(id)` | 节点**涟漪**（`viz-op-traverse`，scale 1→1.18→1），边标记已访问 |
-| 结构旋转（红黑树） | `rotateLeft(x)` / `rotateRight(x)` → `delay()` | 节点位置 `transform` 平滑过渡 + 边重连淡入 |
+| 结构旋转（红黑树） | `rotateLeft(x)` / `rotateRight(x)` → `delay()` | 节点位置补间 + 旋转弧线（左旋/右旋）+ 边重连 |
+| 节点交换 | `swap(a, b)` → `delay()` | 两节点青脉冲 + 弧线 ↔ + 标签对调 |
 | B+ 分裂 | `split(oldId, newId, promote, …)` → `delay()` | 新叶弹入 + 键上浮到父节点 |
 
 **两条硬约束**：

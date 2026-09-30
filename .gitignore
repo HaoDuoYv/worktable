@@ -97,3 +97,7 @@ release-new/
 # vite temp config
 vite.config.ts.timestamp-*.mjs
 /Worktable-mobile-debug.apk
+
+# electron-builder output
+/release/
+/release-dist/

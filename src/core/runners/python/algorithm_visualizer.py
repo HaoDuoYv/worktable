@@ -186,6 +186,18 @@ class GraphTracer(Tracer):
         args: list = [target] if source is None else [target, source]
         self._cmd("deselect", args)
 
+    def set_pointer(self, node_id: int, field: str, child: Optional[int]) -> None:
+        self._cmd("setPointer", [node_id, field, child])
+
+    def rotate_left(self, x: int) -> None:
+        self._cmd("rotateLeft", [x])
+
+    def rotate_right(self, x: int) -> None:
+        self._cmd("rotateRight", [x])
+
+    def swap(self, a: int, b: int) -> None:
+        self._cmd("swap", [a, b])
+
 
 class TreeTracer(GraphTracer):
     """Binary tree / hierarchical tree — same protocol as Graph with tree layout."""
@@ -294,6 +306,9 @@ class RedBlackTreeTracer(GraphTracer):
 
     def rotate_right(self, x: int) -> None:
         self._cmd("rotateRight", [x])
+
+    def swap(self, a: int, b: int) -> None:
+        self._cmd("swap", [a, b])
 
 
 class BPlusTreeTracer(GraphTracer):

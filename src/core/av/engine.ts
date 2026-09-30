@@ -34,6 +34,10 @@ class TracerModel {
   chartKey: string | null = null
   /** Graph → LogTracer sync target (AV GraphTracer.log) */
   graphLogKey: string | null = null
+  /** 待清除的幽灵节点（删除动画，下一 chunk 吸收） */
+  dyingIds = new Set<number>()
+  rotateHint: { pivot: number; lifted: number; dir: 'left' | 'right' } | null = null
+  swapHint: { a: number; b: number } | null = null
 
   constructor(key: string, kind: TracerKind, title: string) {
     this.key = key
@@ -59,6 +63,8 @@ class TracerModel {
       head: this.kind === 'CircularQueueTracer' ? this.head : undefined,
       tail: this.kind === 'CircularQueueTracer' ? this.tail : undefined,
       isStaticList: this.isStaticList || undefined,
+      rotate: this.rotateHint ? { ...this.rotateHint } : null,
+      swap: this.swapHint ? { ...this.swapHint } : null,
     }
   }
 
@@ -303,8 +309,10 @@ export class AvEngine {
 
   private rebuildTreeEdges(model: TracerModel): void {
     const edges: GraphEdgeState[] = []
+    const dying = model.dyingIds
     for (const n of model.nodes) {
-      if (n.left != null) {
+      if (dying.has(n.id)) continue
+      if (n.left != null && !dying.has(n.left)) {
         edges.push({
           source: n.id,
           target: n.left,
@@ -313,7 +321,7 @@ export class AvEngine {
           selectedCount: 0,
         })
       }
-      if (n.right != null) {
+      if (n.right != null && !dying.has(n.right)) {
         edges.push({
           source: n.id,
           target: n.right,
@@ -372,6 +380,9 @@ export class AvEngine {
         else P.right = Y.id
       }
     }
+    X.anim = 'rotate'
+    Y.anim = 'rotate'
+    model.rotateHint = { pivot: X.id, lifted: Y.id, dir }
     // clear dangling child refs on Y that pointed incorrectly
     this.rebuildTreeEdges(model)
   }
@@ -741,6 +752,7 @@ export class AvEngine {
   }
 
   private applyGraph(model: TracerModel, method: string, args: unknown[]): void {
+    const aliveNodes = () => model.nodes.filter((n) => !model.dyingIds.has(n.id))
     const relayout = (rootId?: number) => {
       const mode =
         model.kind === 'TreeTracer' ||
@@ -748,11 +760,12 @@ export class AvEngine {
         model.kind === 'BPlusTreeTracer'
           ? 'tree'
           : model.layoutMethod
-      if (mode === 'tree') treeLayout(model.nodes, model.edges, rootId)
-      else if (mode === 'random') randomLayout(model.nodes)
-      else circleLayout(model.nodes)
+      const alive = aliveNodes()
+      if (mode === 'tree') treeLayout(alive, model.edges, rootId)
+      else if (mode === 'random') randomLayout(alive)
+      else circleLayout(alive)
     }
-    const ensureNode = (id: number, weight: number | null = null) => {
+    const ensureNode = (id: number, weight: number | null = null, markBorn = true) => {
       let n = model.nodes.find((x) => x.id === id)
       if (!n) {
         n = {
@@ -764,8 +777,10 @@ export class AvEngine {
           selectedCount: 0,
           color: model.kind === 'RedBlackTreeTracer' ? 'black' : null,
           label: null,
+          anim: markBorn ? 'born' : null,
         }
         model.nodes.push(n)
+        model.dyingIds.delete(id)
       }
       return n
     }
@@ -839,6 +854,27 @@ export class AvEngine {
         relayout()
         break
       }
+      case 'swap': {
+        // swap(a, b)：交换两节点的标签/权/颜色，并标记交换动画
+        const [a, b] = args as [number, number]
+        const na = model.nodes.find((n) => n.id === a && !model.dyingIds.has(a))
+        const nb = model.nodes.find((n) => n.id === b && !model.dyingIds.has(b))
+        if (na && nb) {
+          const tl = na.label
+          na.label = nb.label
+          nb.label = tl
+          const tw = na.weight
+          na.weight = nb.weight
+          nb.weight = tw
+          const tc = na.color
+          na.color = nb.color
+          nb.color = tc
+          na.anim = 'swap'
+          nb.anim = 'swap'
+          model.swapHint = { a, b }
+        }
+        break
+      }
       case 'split':
       case 'splitNode': {
         // split(oldId, newId, promoteLabel, leftLabel?, rightLabel?)
@@ -887,11 +923,12 @@ export class AvEngine {
         const payload = args[0]
         model.nodes = []
         model.edges = []
+        model.dyingIds.clear()
         // adjacency matrix
         if (Array.isArray(payload) && Array.isArray(payload[0])) {
           const grid = payload as unknown[][]
           for (let i = 0; i < grid.length; i++) {
-            ensureNode(i)
+            ensureNode(i, null, false)
             for (let j = 0; j < grid.length; j++) {
               if (grid[i]?.[j]) {
                 model.edges.push({
@@ -917,7 +954,7 @@ export class AvEngine {
           }[]
           items.forEach((it, i) => {
             const id = it.id ?? i
-            const n = ensureNode(id)
+            const n = ensureNode(id, null, false)
             if (it.color) n.color = it.color === 'red' ? 'red' : 'black'
             if (it.label != null) n.label = String(it.label)
             else if (it.value != null) n.label = String(it.value)
@@ -937,7 +974,7 @@ export class AvEngine {
           // if left/right given, also link
           for (const n of model.nodes) {
             if (n.left != null) {
-              ensureNode(n.left).parent = n.id
+              ensureNode(n.left, null, false).parent = n.id
               if (!model.edges.find((e) => e.source === n.id && e.target === n.left)) {
                 model.edges.push({
                   source: n.id,
@@ -949,7 +986,7 @@ export class AvEngine {
               }
             }
             if (n.right != null) {
-              ensureNode(n.right).parent = n.id
+              ensureNode(n.right, null, false).parent = n.id
               if (!model.edges.find((e) => e.source === n.id && e.target === n.right)) {
                 model.edges.push({
                   source: n.id,
@@ -984,7 +1021,14 @@ export class AvEngine {
       case 'removeNode':
       case 'remove_node': {
         const [id] = args as [number]
-        model.nodes = model.nodes.filter((n) => n.id !== id)
+        const n = model.nodes.find((x) => x.id === id)
+        if (n && !model.dyingIds.has(id)) {
+          n.anim = 'dying'
+          model.dyingIds.add(id)
+          n.left = null
+          n.right = null
+          n.parent = null
+        }
         model.edges = model.edges.filter((e) => e.source !== id && e.target !== id)
         relayout()
         break
@@ -1076,6 +1120,18 @@ export class AvEngine {
   }
 
   private applyChunk(chunk: AvChunk): void {
+    // 新 chunk 开始：吸收上一帧幽灵节点、清除瞬时动画标记
+    for (const model of this.objects.values()) {
+      if (model.dyingIds.size > 0) {
+        model.nodes = model.nodes.filter((n) => !model.dyingIds.has(n.id))
+        model.dyingIds.clear()
+      }
+      for (const n of model.nodes) {
+        if (n.anim) n.anim = null
+      }
+      model.rotateHint = null
+      model.swapHint = null
+    }
     for (const command of chunk.commands) this.applyCommand(command)
   }
 

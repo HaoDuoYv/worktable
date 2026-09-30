@@ -177,7 +177,7 @@ export function buildAlgoSystemPrompt(): string {
     visAnimRaw,
     '可用 Tracer：Array1DTracer, Array2DTracer, LogTracer, GraphTracer, TreeTracer, StackTracer, QueueTracer, LinkedListTracer, CircularQueueTracer, DequeTracer, RedBlackTreeTracer, BPlusTreeTracer, StaticLinkedListTracer, ChartTracer, ScatterTracer, MarkdownTracer。',
     '序列：Stack push/pop；Queue enqueue/dequeue；LinkedList push/unshift/pop/shift；CircularQueue init/enqueue/dequeue；Deque pushFront/popFront/pushBack/popBack。',
-    '树：RedBlackTree set([{id,parent,left,right,color,label}])+setColor+rotateLeft/rotateRight；BPlusTree set+split/setLabel。',
+    '树：RedBlackTree set([{id,parent,left,right,color,label}])+setColor+rotateLeft/rotateRight+swap(a,b)；BPlusTree set+split/setLabel。',
     '静态链表：StaticLinkedList init/setData/setNext 或 set(data,next)。',
     '图（对齐官方 AV）：GraphTracer.set(邻接矩阵) 或 addNode/addEdge/removeNode/removeEdge/updateNode/updateEdge；directed(bool)、weighted(bool)；layoutCircle()/layoutTree(root?)/layoutRandom()；visit/leave/select/deselect；graph.log(logTracer) 可自动写访问日志。',
     '图表：ChartTracer.set(数值数组) 或 Array1D.set 后 array1d.chart(chartTracer) 同步柱状图；ScatterTracer.set([[x,y],…]) 散点。',

@@ -34,6 +34,9 @@ export interface CellState {
   selected: boolean
 }
 
+/** 当前 chunk 的瞬时动画标记（下一 chunk 清除） */
+export type NodeAnim = 'born' | 'dying' | 'swap' | 'rotate' | null
+
 export interface GraphNodeState {
   id: number
   weight: number | null
@@ -46,6 +49,7 @@ export interface GraphNodeState {
   parent?: number | null
   left?: number | null
   right?: number | null
+  anim?: NodeAnim
 }
 
 export interface GraphEdgeState {
@@ -79,6 +83,10 @@ export interface TracerViewState {
   layout?: 'circle' | 'tree' | 'random' | null
   /** MarkdownTracer body */
   markdown?: string
+  /** 旋转高亮：支点 + 上提节点 + 方向 */
+  rotate?: { pivot: number; lifted: number; dir: 'left' | 'right' } | null
+  /** 交换高亮：两节点 id */
+  swap?: { a: number; b: number } | null
 }
 
 export function buildChunks(commands: AvCommand[]): AvChunk[] {
