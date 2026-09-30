@@ -1,0 +1,300 @@
+/**
+ * 移动端适配 —— 底部 Tab 导航 + 安全区 + 触摸优化 + 「我的」页
+ * 在 shell.css / ui.css / overview.css 之后加载，窄屏规则覆盖其上。
+ */
+
+/* 桌面端默认隐藏移动组件 */
+.app-shell__tabbar,
+.app-shell__m-action {
+  display: none;
+}
+
+/* ===================== ≤ 900px 移动端布局 ===================== */
+
+@media (max-width: 900px) {
+  /* 隐藏桌面侧栏，单列布局 */
+  .app-shell__nav {
+    display: none;
+  }
+
+  .app-shell,
+  .app-shell.is-nav-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-height) 1fr;
+    grid-template-areas:
+      'header'
+      'main';
+  }
+
+  /* 顶栏：AI + 设置齿轮（移动端入口） */
+  .app-shell__m-action {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: var(--radius);
+    color: var(--text-muted);
+  }
+
+  .app-shell__m-action:hover {
+    color: var(--text);
+    background: var(--ink-800);
+    text-decoration: none;
+  }
+
+  .app-shell__header {
+    padding: 0 10px;
+    padding-top: env(safe-area-inset-top, 0);
+    gap: 8px;
+  }
+
+  .app-shell__account .app-shell__login-link {
+    max-width: 88px;
+  }
+
+  /* 底部 Tab 栏 */
+  .app-shell__tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    background: color-mix(in srgb, var(--panel) 90%, transparent);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .app-shell__tab {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 60px;
+    padding: 6px 2px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 500;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-shell__tab:hover {
+    text-decoration: none;
+    color: var(--text);
+  }
+
+  .app-shell__tab.is-active {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .app-shell__tab-label {
+    line-height: 1;
+  }
+
+  /* 主内容底部留白，避免被 Tab 栏遮挡 */
+  .app-shell__main {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0));
+  }
+
+  /* 页面内边距收紧，占满屏宽 */
+  .page {
+    padding: 14px 14px 20px;
+    max-width: 100%;
+  }
+
+  /* 触摸目标：交互元素至少 44px */
+  .app-shell__tab {
+    min-height: 60px;
+  }
+
+  /* 概览：统计条 2×2，双栏折叠为单列 */
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .stat-tile {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .ov-grid,
+  .news-page__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ov-head {
+    flex-wrap: wrap;
+  }
+
+  .ov-head__title {
+    font-size: 20px;
+  }
+
+  .ov-weather__temp {
+    font-size: 28px;
+  }
+
+  /* 设置页：分组导航改横向滚动 chips，正文单列 */
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-nav__item {
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 40px;
+  }
+
+  .settings-field__input {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* ===================== 「我的」页 ===================== */
+
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.profile-card__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--signal)));
+  color: var(--accent-fg);
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-card__name {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  color: var(--text);
+}
+
+.profile-card__sub {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px;
+  margin-top: 4px;
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-ui);
+}
+
+.profile-row:hover {
+  background: var(--panel-2);
+  text-decoration: none;
+}
+
+.profile-row__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.profile-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-row__title {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.profile-row__desc {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+.profile-row__chevron {
+  color: var(--text-subtle);
+  transform: rotate(-90deg);
+  flex-shrink: 0;
+}
+
+.profile-version {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  margin: 8px 0 0;
+}
+
+@media (max-width: 900px) {
+  .profile-row {
+    padding: 14px 10px;
+  }
+}

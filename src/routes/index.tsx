@@ -8,6 +8,7 @@ import { AlgorithmsLabPage } from '@/modules/algorithms/AlgorithmsLabPage'
 import { AiPage } from '@/modules/ai/AiPage'
 import { NewsPage } from '@/modules/news/NewsPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
+import { ProfilePage } from '@/modules/profile/ProfilePage'
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '@/modules/auth/AuthPages'
 
 export const router = createBrowserRouter([
@@ -49,6 +50,11 @@ export const router = createBrowserRouter([
         path: 'settings',
         element: <SettingsPage />,
         handle: { title: '设置' },
+      },
+      {
+        path: 'profile',
+        element: <ProfilePage />,
+        handle: { title: '我的' },
       },
     ],
   },

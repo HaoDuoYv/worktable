@@ -7,18 +7,24 @@ import { Icon, WorktableMark, type IconName } from '@/components/Icon'
 import { IconButton } from '@/components/IconButton'
 import { AiJobDock } from '@/modules/ai/AiJobDock'
 
-const NAV_ITEMS: {
-  to: string
-  label: string
-  end?: boolean
-  icon: IconName
-}[] = [
+type NavItem = { to: string; label: string; end?: boolean; icon: IconName }
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/', label: '概览', end: true, icon: 'overview' },
   { to: '/tutorials', label: '教程', icon: 'tutorials' },
   { to: '/algorithms', label: '算法', icon: 'algorithms' },
   { to: '/ai', label: 'AI', icon: 'ai' },
   { to: '/news', label: '新闻', icon: 'news' },
   { to: '/settings', label: '设置', icon: 'settings' },
+]
+
+/** 移动端底部 Tab（5 项）：AI 与设置收进顶栏 */
+const MOBILE_TABS: NavItem[] = [
+  { to: '/', label: '概览', end: true, icon: 'overview' },
+  { to: '/tutorials', label: '教程', icon: 'tutorials' },
+  { to: '/algorithms', label: '算法', icon: 'algorithms' },
+  { to: '/news', label: '新闻', icon: 'news' },
+  { to: '/profile', label: '我的', icon: 'user' },
 ]
 
 function useRouteChrome(): { title: string; flush: boolean } {
@@ -111,6 +117,12 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <header className="app-shell__header">
         <h1 className="app-shell__header-title">{title}</h1>
         <div className="app-shell__header-actions">
+          <Link to="/ai" className="app-shell__m-action" title="AI 助手" aria-label="AI 助手">
+            <Icon name="ai" size={20} />
+          </Link>
+          <Link to="/settings" className="app-shell__m-action" title="设置" aria-label="设置">
+            <Icon name="settings" size={20} />
+          </Link>
           {isGuest ? (
             <Link to="/login" className="app-shell__login-link">
               登录
@@ -136,6 +148,23 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <main id="main-content" className={`app-shell__main${flush ? ' is-flush' : ''}`}>
         {children ?? <Outlet />}
       </main>
+
+      <nav className="app-shell__tabbar" aria-label="底部导航">
+        {MOBILE_TABS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `app-shell__tab${isActive ? ' is-active' : ''}`
+            }
+          >
+            <Icon name={item.icon} size={22} />
+            <span className="app-shell__tab-label">{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
       <AiJobDock />
     </div>
   )

@@ -104,6 +104,8 @@ function aqiText(aqi: number): string {
 /* —— 请求工具 —— */
 
 import { fetchRaw } from '@/modules/news/newsFetcher'
+import { Capacitor } from '@capacitor/core'
+import { Geolocation } from '@capacitor/geolocation'
 
 /**
  * 统一走 /news/proxy 抓取（Node 侧网络路径稳定），无代理环境降级直连。
@@ -132,16 +134,31 @@ async function geocodeCity(city: string): Promise<{ lat: number; lon: number; na
   throw new Error(`找不到城市「${city}」`)
 }
 
-function getBrowserPosition(): Promise<GeolocationPosition> {
+interface LatLon {
+  latitude: number
+  longitude: number
+}
+
+/** 获取位置：原生环境走 @capacitor/geolocation，浏览器走 navigator.geolocation */
+async function getPosition(): Promise<LatLon> {
+  if (Capacitor.isNativePlatform()) {
+    const pos = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: false,
+      timeout: 5000,
+      maximumAge: 30 * 60 * 1000,
+    })
+    return { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+  }
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) {
       reject(new Error('当前环境不支持定位'))
       return
     }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      timeout: 5000,
-      maximumAge: 30 * 60 * 1000,
-    })
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+      reject,
+      { timeout: 5000, maximumAge: 30 * 60 * 1000 },
+    )
   })
 }
 
@@ -260,8 +277,7 @@ export function invalidateWeatherCache(): void {
 async function resolveAndFetch(settings: WeatherSettings): Promise<WeatherNow> {
   if (settings.autoLocation) {
     try {
-      const pos = await getBrowserPosition()
-      const { latitude, longitude } = pos.coords
+      const { latitude, longitude } = await getPosition()
       const city = await reverseCityName(latitude, longitude)
       return await fetchWeatherByCoords(latitude, longitude, city, true)
     } catch {

@@ -7,6 +7,7 @@ export type IconName =
   | 'ai'
   | 'news'
   | 'settings'
+  | 'user'
   | 'sun'
   | 'moon'
   | 'step-back'
@@ -72,6 +73,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="3" />
       <path d="M12 3.75v2M12 18.25v2M3.75 12h2M18.25 12h2M6.2 6.2l1.4 1.4M16.4 16.4l1.4 1.4M17.8 6.2l-1.4 1.4M7.6 16.4l-1.4 1.4" />
+    </>
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5.25 19.5c.8-3.4 3.5-5.2 6.75-5.2s5.95 1.8 6.75 5.2" strokeLinecap="round" />
     </>
   ),
   sun: (

@@ -96,3 +96,4 @@ release-new/
 
 # vite temp config
 vite.config.ts.timestamp-*.mjs
+/Worktable-mobile-debug.apk

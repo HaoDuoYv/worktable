@@ -1,10 +1,12 @@
 import type { NewsCategory, NewsItem } from './types'
 import { NEWS_SOURCES, type NewsSource } from './sources'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
 /**
  * 抓取层：负责「拿原文 → 解析成 NewsItem[]」。
  * 渲染层通过 /news/proxy 交给 Electron/vite 主进程抓取，绕过浏览器 CORS；
  * 纯浏览器（无代理）降级直连，失败则抛错交由上层标「源不可用」。
+ * Android 原生环境（Capacitor）走 CapacitorHttp 原生 HTTP 栈，天然无 CORS。
  */
 
 function hashStr(s: string): string {
@@ -70,8 +72,25 @@ async function directFetch(url: string, headers: Record<string, string>): Promis
   }
 }
 
+/** Android/原生环境：走 CapacitorHttp 原生 HTTP 栈，绕过 CORS（无 Node 侧代理） */
+async function nativeFetch(url: string, headers: Record<string, string>): Promise<string> {
+  const res = await CapacitorHttp.request({
+    url,
+    method: 'GET',
+    headers,
+    responseType: 'text',
+    connectTimeout: 8000,
+    readTimeout: 8000,
+  })
+  if (res.status < 200 || res.status >= 300) throw new Error(`HTTP ${res.status}`)
+  return typeof res.data === 'string' ? res.data : JSON.stringify(res.data)
+}
+
 export async function fetchRaw(url: string, headers?: Record<string, string>): Promise<string> {
   const h = headers ?? {}
+  if (Capacitor.isNativePlatform()) {
+    return await nativeFetch(url, h)
+  }
   try {
     return await viaProxy(url, h)
   } catch (e) {
