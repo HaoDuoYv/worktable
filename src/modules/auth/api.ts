@@ -1,3 +1,5 @@
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
+
 export interface AuthUser {
   id: string
   email: string
@@ -151,14 +153,49 @@ async function rawFetch(path: string, init: RequestInit = {}, token?: string) {
     throw new ApiError(0, '云端地址无效，请填写服务器域名或 http://IP:端口')
   }
   const url = `${base}${path}`
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers || {}),
-    },
-  })
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...((init.headers as Record<string, string> | undefined) ?? {}),
+  }
+
+  // Android/原生环境：走 CapacitorHttp 原生 HTTP 栈，绕过 WebView 的 CORS 限制
+  // （WebView 页面 origin 是 https://localhost，跨域 fetch 会被后端 CORS 拦截）
+  if (Capacitor.isNativePlatform()) {
+    const res = await CapacitorHttp.request({
+      url,
+      method: (init.method ?? 'GET') as 'GET' | 'POST' | 'PUT' | 'DELETE',
+      headers,
+      data: init.body ? (JSON.parse(init.body as string) as unknown) : undefined,
+      responseType: 'text',
+      connectTimeout: 10000,
+      readTimeout: 10000,
+    })
+    const finalUrl = res.url || url
+    // Domain block / hosting intercept (e.g. DNSPod webblock 302 HTML)
+    if (finalUrl.includes('webblock') || finalUrl.includes('dnspod')) {
+      throw new ApiError(
+        res.status,
+        '云端域名被拦截或未备案，请改用自定义服务地址（服务器 IP 或已备案域名）',
+      )
+    }
+    const contentType = (res.headers?.['Content-Type'] || res.headers?.['content-type'] || '').toLowerCase()
+    let data: Record<string, unknown>
+    try {
+      data = typeof res.data === 'string' ? JSON.parse(res.data) : (res.data as Record<string, unknown>)
+    } catch {
+      data = {}
+    }
+    if (!contentType.includes('application/json') && res.status === 200) {
+      throw new ApiError(res.status, '云端返回了非 JSON（可能域名被拦截），请改用自定义服务地址')
+    }
+    if (res.status < 200 || res.status >= 300) {
+      throw new ApiError(res.status, (data as { error?: string }).error || `HTTP ${res.status}`)
+    }
+    return data
+  }
+
+  const res = await fetch(url, { ...init, headers })
   // Domain block / hosting intercept (e.g. DNSPod webblock 302 HTML)
   if (res.redirected || res.url.includes('webblock') || res.url.includes('dnspod')) {
     throw new ApiError(
