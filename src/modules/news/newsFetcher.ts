@@ -1,5 +1,6 @@
 import type { NewsCategory, NewsItem } from './types'
-import { NEWS_SOURCES, type NewsSource } from './sources'
+import { enabledSources, type NewsSource } from './sources'
+import { classifyNews } from './topics'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
 /**
@@ -183,14 +184,24 @@ export async function fetchSource(source: NewsSource): Promise<NewsItem[]> {
   const text = await fetchRaw(source.url, source.headers)
   const limit = source.limit ?? 15
   const raw = source.kind === 'rss' ? parseRss(text, limit) : parseJson(source, text)
-  return raw.map((r) => ({
-    id: `${source.id}_${hashStr(r.title)}`,
-    title: r.title,
-    url: r.url,
-    source: source.name,
-    category: source.category,
-    heat: 'heat' in r ? (r.heat as string | undefined) : undefined,
-  }))
+  return raw.map((r) => {
+    const item: NewsItem = {
+      id: `${source.id}_${hashStr(r.title)}`,
+      title: r.title,
+      url: r.url,
+      source: source.name,
+      category: source.category,
+      heat: 'heat' in r ? (r.heat as string | undefined) : undefined,
+    }
+    // AI 类新闻做三层关键词分类（领域主题 / 反面词 / 信号词）
+    if (source.category === 'ai') {
+      const cls = classifyNews(r.title)
+      if (cls.topics.length > 0) item.topics = cls.topics
+      if (cls.isNegative) item.isNegative = true
+      if (cls.isSignal) item.isSignal = true
+    }
+    return item
+  })
 }
 
 /* —— 某类全部源抓取（并发 + 容错） —— */
@@ -214,7 +225,7 @@ function dedupe(items: NewsItem[]): NewsItem[] {
 }
 
 export async function fetchCategory(category: NewsCategory): Promise<FetchResult> {
-  const sources = NEWS_SOURCES.filter((s) => s.category === category)
+  const sources = enabledSources(category)
   const results = await Promise.allSettled(sources.map((s) => fetchSource(s)))
   const items: NewsItem[] = []
   const failedSources: string[] = []

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getNewsState, subscribeNews, ensureNews, refreshNews } from './newsService'
 import { NEWS_SOURCES } from './sources'
 import { CATEGORY_META, type NewsCategory, type NewsDigest } from './types'
+import { topicLabel } from './topics'
 
 function fmtTime(ts?: number): string {
   if (!ts) return ''
@@ -195,7 +196,19 @@ export function NewsPage() {
                             {open && it.summary ? (
                               <p className="news-item__summary">{it.summary}</p>
                             ) : null}
-                            <span className="news-item__source">{it.source}</span>
+                            <div className="news-item__meta">
+                              <span className="news-item__source">{it.source}</span>
+                              {it.topics?.slice(0, 2).map((t) => (
+                                <span key={t} className={`news-item__tag news-item__tag--${t}`}>
+                                  {topicLabel(t)}
+                                </span>
+                              ))}
+                              {it.isNegative ? (
+                                <span className="news-item__flag is-negative">⚠ 关注</span>
+                              ) : it.isSignal ? (
+                                <span className="news-item__flag is-signal">值得关注</span>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="news-item__aside">
                             {it.heat ? <span className="news-item__heat">{it.heat}</span> : null}

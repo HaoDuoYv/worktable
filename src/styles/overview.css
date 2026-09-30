@@ -719,3 +719,26 @@
     flex-wrap: wrap;
   }
 }
+
+/* —— AI 速览卡：主题标签 + 反面标记 —— */
+
+.ov-digest__tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--line);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ov-digest__tag--ai-coding { color: var(--accent); background: var(--accent-soft); }
+.ov-digest__tag--embodied  { color: var(--signal); background: var(--signal-soft); }
+.ov-digest__tag--foundation { color: var(--warn); background: rgba(220, 220, 170, 0.12); }
+.ov-digest__tag--safety    { color: var(--danger); background: rgba(248, 81, 73, 0.12); }
+
+.ov-digest__flag {
+  font-size: 11px;
+  color: var(--danger);
+  flex-shrink: 0;
+}

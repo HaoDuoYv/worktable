@@ -408,3 +408,37 @@
     animation: none;
   }
 }
+
+/* —— AI 新闻三层分类标签（topics.ts：主题徽标 / 反面词 / 信号词） —— */
+
+.news-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.news-item__tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--line);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.news-item__tag--ai-coding { color: var(--accent); background: var(--accent-soft); }
+.news-item__tag--embodied  { color: var(--signal); background: var(--signal-soft); }
+.news-item__tag--foundation { color: var(--warn); background: rgba(220, 220, 170, 0.12); }
+.news-item__tag--safety    { color: var(--danger); background: rgba(248, 81, 73, 0.12); }
+
+.news-item__flag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.news-item__flag.is-negative { color: var(--danger); background: rgba(248, 81, 73, 0.14); }
+.news-item__flag.is-signal   { color: var(--accent); background: var(--accent-soft); }

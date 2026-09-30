@@ -1,8 +1,8 @@
 import { kvGet, kvSet } from '@/core/storage/indexedDb'
 import type { NewsDigest } from './types'
 
-/** 按天缓存：key = 'news:v2:YYYY-MM-DD'（v2：新增 toutiao 分类，旧缓存作废） */
-const KEY_PREFIX = 'news:v2:'
+/** 按天缓存：key = 'news:v3:YYYY-MM-DD'（v3：新增 topics/isNegative 三层分类，旧缓存作废） */
+const KEY_PREFIX = 'news:v3:'
 
 export function todayKey(date = new Date()): string {
   const y = date.getFullYear()

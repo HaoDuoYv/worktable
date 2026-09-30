@@ -5,6 +5,7 @@ import type { Tutorial } from '@/modules/tutorials/types'
 import type { Algorithm } from '@/modules/algorithms/types'
 import { isAiConfigured } from '@/modules/ai/aiClient'
 import { getNewsState, subscribeNews, ensureNews } from '@/modules/news/newsService'
+import { topicLabel } from '@/modules/news/topics'
 import {
   ensureWeather,
   getWeatherState,
@@ -307,6 +308,14 @@ function AiNewsCard({ index }: { index: number }) {
                 {it.title}
               </a>
               <span className="ov-digest__src">{it.source}</span>
+              {it.topics?.slice(0, 1).map((t) => (
+                <span key={t} className={`ov-digest__tag ov-digest__tag--${t}`}>
+                  {topicLabel(t)}
+                </span>
+              ))}
+              {it.isNegative ? (
+                <span className="ov-digest__flag">⚠</span>
+              ) : null}
             </li>
           ))}
         </ul>

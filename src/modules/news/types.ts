@@ -24,6 +24,12 @@ export interface NewsItem {
   category: NewsCategory
   /** 热度值（热榜类源，如「482万」） */
   heat?: string
+  /** 领域主题 id 列表（AI 类新闻，经 topics.ts 三层关键词分类） */
+  topics?: string[]
+  /** 是否命中反面词（砍掉/漏洞/召回等，UI 高亮提醒） */
+  isNegative?: boolean
+  /** 是否命中信号词（模型/公司/benchmark，UI 标「值得关注」） */
+  isSignal?: boolean
 }
 
 export type NewsStatus = 'idle' | 'generating' | 'done' | 'error'
