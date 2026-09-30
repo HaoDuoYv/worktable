@@ -1,0 +1,109 @@
+/**
+ * Worktable 动效系统（见 docs/UIUX_REDESIGN.md §4）
+ * CSS-only：入场编排 / 微交互 / reduced-motion 兜底
+ * 桌面与安卓共用；hover 类交互只在支持 hover 的指针设备生效。
+ */
+
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 150ms;
+  --dur-2: 240ms;
+  --dur-3: 400ms;
+  --stagger-step: 60ms;
+}
+
+/* —— 入场编排：出现顺序 = 阅读顺序 —— */
+
+.anim-rise {
+  animation: rise-in var(--dur-3) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger-step));
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* 列表行接续 stagger：由父级 --i-base 接力 */
+.anim-rise-row {
+  animation: rise-in var(--dur-2) var(--ease-out) both;
+  animation-delay: calc((var(--i-base, 0) + var(--i, 0)) * var(--stagger-step));
+}
+
+/* —— 卡片 hover 抬升（内容面板统一） —— */
+
+@media (hover: hover) {
+  .ov-card,
+  .stat-tile {
+    transition:
+      transform var(--dur-2) var(--ease-out),
+      border-color var(--dur-2) var(--ease-out),
+      box-shadow var(--dur-2) var(--ease-out);
+  }
+
+  .ov-card:hover,
+  .stat-tile:hover {
+    transform: translateY(-2px);
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-2);
+  }
+}
+
+/* —— 按压反馈 —— */
+
+.btn:active,
+.ov-hotlist__row:active,
+.ov-alist__row:active {
+  transform: scale(0.97);
+}
+
+.btn,
+.ov-hotlist__row,
+.ov-alist__row {
+  transition: transform var(--dur-1) var(--ease-spring);
+}
+
+/* —— 底部 Tab（安卓）激活回弹 —— */
+
+.app-shell__tabbar a {
+  transition: transform var(--dur-2) var(--ease-spring), color var(--dur-1) ease;
+}
+
+.app-shell__tabbar a.is-active,
+.app-shell__tabbar a[aria-current='page'] {
+  transform: translateY(-2px);
+}
+
+@media (hover: hover) {
+  .app-shell__tabbar a:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* —— reduced-motion：全部直达终态 —— */
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise,
+  .anim-rise-row {
+    animation: none;
+  }
+
+  .ov-card,
+  .stat-tile,
+  .btn,
+  .ov-hotlist__row,
+  .ov-alist__row,
+  .app-shell__tabbar a {
+    transition: none;
+  }
+
+  .ov-card:hover,
+  .stat-tile:hover,
+  .app-shell__tabbar a.is-active,
+  .app-shell__tabbar a[aria-current='page'] {
+    transform: none;
+  }
+}

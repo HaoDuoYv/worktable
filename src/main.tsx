@@ -11,6 +11,7 @@ import './styles/algo-lab.css'
 import './styles/select-menu.css'
 import './styles/news.css'
 import './styles/overview.css'
+import './styles/motion.css'
 import './styles/mobile.css'
 
 // 启动即应用主题偏好（主题色预设 / 玻璃液态 / 自定义主题）

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { listAlgorithms, listTutorials } from '@/core/storage/indexedDb'
 import type { Tutorial } from '@/modules/tutorials/types'
@@ -138,47 +138,49 @@ function WeatherGlyph({ icon, size = 20 }: { icon: WeatherNow['icon']; size?: nu
   }
 }
 
-/* —— 天气卡 —— */
-
 function fmtWeatherTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
-function WeatherCard() {
+function useWeather() {
   const [state, setState] = useState(getWeatherState())
   useEffect(() => subscribeWeather(() => setState(getWeatherState())), [])
   useEffect(() => {
     void ensureWeather().catch(() => undefined)
   }, [])
+  return state
+}
 
+function useNews() {
+  const [state, setState] = useState(getNewsState())
+  useEffect(() => subscribeNews(() => setState(getNewsState())), [])
+  return state
+}
+
+/* —— HERO：当日天气 —— */
+
+function WeatherHero() {
+  const state = useWeather()
   const w = state.data
 
   return (
-    <section className="panel ov-card" aria-label="当日天气">
-      <header className="ov-card__head">
-        <h2 className="ov-card__title">当日天气</h2>
-        {w ? <span className="ov-chip">{w.city}</span> : null}
-      </header>
-      {state.status === 'loading' || state.status === 'idle' ? (
-        <p className="ov-muted">获取天气中…</p>
-      ) : state.status === 'error' || !w ? (
-        <p className="ov-muted">
-          天气获取失败{state.error ? `：${state.error}` : ''}。可在设置中调整城市。
-        </p>
-      ) : (
+    <section className="panel ov-hero__card ov-hero__weather anim-rise" style={{ '--i': 0 } as CSSProperties} aria-label="当日天气">
+      {w ? (
         <>
-          <div className="ov-weather__main">
-            <span className="ov-weather__icon">
-              <WeatherGlyph icon={w.icon} size={44} />
+          <div className="ov-hero__weather-main">
+            <span className="ov-hero__weather-icon" aria-hidden="true">
+              <WeatherGlyph icon={w.icon} size={48} />
             </span>
-            <div>
-              <div className="ov-weather__temp">{w.tempC}°C</div>
-              <div className="ov-muted">
-                {w.text} · 体感 {w.feelsLikeC}°C · 更新于 {fmtWeatherTime(w.updatedAt)}
-              </div>
+            <div className="ov-hero__weather-num">
+              <span className="ov-hero__temp">{w.tempC}°</span>
+              <span className="ov-hero__weather-text">
+                {w.text}
+                <em>体感 {w.feelsLikeC}° · {w.city}</em>
+              </span>
             </div>
+            <span className="ov-hero__updated">更新于 {fmtWeatherTime(w.updatedAt)}</span>
           </div>
-          <div className="ov-weather__meta">
+          <div className="ov-hero__weather-meta">
             <div className="ov-weather__cell">
               <span className="ov-weather__k">湿度</span>
               <span className="ov-weather__v">{w.humidity}%</span>
@@ -189,27 +191,31 @@ function WeatherCard() {
             </div>
             <div className="ov-weather__cell">
               <span className="ov-weather__k">空气质量</span>
-              <span className="ov-weather__v is-signal">
-                {w.aqiText ? `${w.aqiText}${w.aqi != null ? ` · AQI ${w.aqi}` : ''}` : '—'}
+              <span className={`ov-weather__v${w.aqiText ? ' is-signal' : ''}`}>
+                {w.aqiText ? `${w.aqiText}${w.aqi != null ? ` · ${w.aqi}` : ''}` : '—'}
               </span>
             </div>
           </div>
         </>
+      ) : state.status === 'error' ? (
+        <p className="ov-muted">
+          天气获取失败{state.error ? `：${state.error}` : ''}。可在设置中调整城市。
+        </p>
+      ) : (
+        <p className="ov-muted ov-hero__placeholder">正在获取今日天气…</p>
       )}
     </section>
   )
 }
 
-/* —— 今日头条卡 —— */
+/* —— HERO：今日热点 —— */
 
-function ToutiaoCard() {
-  const [state, setState] = useState(getNewsState())
-  useEffect(() => subscribeNews(() => setState(getNewsState())), [])
-
+function HotlistHero() {
+  const state = useNews()
   const items = (state.digest?.items ?? []).filter((it) => it.category === 'toutiao').slice(0, 5)
 
   return (
-    <section className="panel ov-card" aria-label="今日头条">
+    <section className="panel ov-hero__card ov-hero__hotlist anim-rise" style={{ '--i': 1 } as CSSProperties} aria-label="今日热点">
       <header className="ov-card__head">
         <h2 className="ov-card__title">
           <span className="ov-flame" aria-hidden="true">
@@ -220,18 +226,24 @@ function ToutiaoCard() {
               />
             </svg>
           </span>
-          今日头条
+          今日热点
         </h2>
         <Link to="/news" className="ov-link">
-          查看全部
+          查看全部 →
         </Link>
       </header>
       {items.length === 0 ? (
-        <p className="ov-muted">热榜尚未生成，打开新闻页可手动刷新。</p>
+        <p className="ov-muted ov-hero__placeholder">
+          {state.loading || state.digest?.status === 'generating' ? '热榜抓取中…' : '热榜尚未生成，打开新闻页可手动刷新。'}
+        </p>
       ) : (
         <ol className="ov-hotlist">
           {items.map((it, idx) => (
-            <li key={it.id} className="ov-hotlist__row">
+            <li
+              key={it.id}
+              className="ov-hotlist__row anim-rise-row"
+              style={{ '--i': idx, '--i-base': 2 } as CSSProperties}
+            >
               <span className={`ov-hotlist__rank${idx < 3 ? ' is-top' : ''}`}>{idx + 1}</span>
               <a
                 className="ov-hotlist__title"
@@ -244,7 +256,7 @@ function ToutiaoCard() {
               >
                 {it.title}
               </a>
-              {it.heat ? <span className="ov-hotlist__heat">{it.heat}</span> : null}
+              {it.heat ? <span className="ov-hotlist__heat">{it.heat} 热度</span> : null}
             </li>
           ))}
         </ol>
@@ -256,14 +268,16 @@ function ToutiaoCard() {
 
 /* —— AI 新闻速览卡 —— */
 
-function AiNewsCard() {
-  const [state, setState] = useState(getNewsState())
-  useEffect(() => subscribeNews(() => setState(getNewsState())), [])
-
+function AiNewsCard({ index }: { index: number }) {
+  const state = useNews()
   const items = (state.digest?.items ?? []).filter((it) => it.category === 'ai').slice(0, 3)
 
   return (
-    <section className="panel ov-card" aria-label="AI 新闻速览">
+    <section
+      className="panel ov-card anim-rise"
+      style={{ '--i': index } as CSSProperties}
+      aria-label="AI 新闻速览"
+    >
       <header className="ov-card__head">
         <h2 className="ov-card__title">AI 新闻速览</h2>
         <Link to="/news" className="ov-link">
@@ -356,7 +370,13 @@ export function OverviewPage() {
         </div>
       </header>
 
-      <section className="stat-row" aria-label="工作台状态">
+      {/* HERO：天气 + 今日热点 置顶 */}
+      <div className="ov-hero" aria-label="今日简报">
+        <WeatherHero />
+        <HotlistHero />
+      </div>
+
+      <section className="stat-row anim-rise" style={{ '--i': 2 } as CSSProperties} aria-label="工作台状态">
         <div className="stat-tile">
           <div className="stat-tile__body">
             <span className="stat-tile__label">教程进度</span>
@@ -386,12 +406,15 @@ export function OverviewPage() {
           </div>
           <span className="stat-tile__sub">{aiReady ? '接口已配置' : '去设置里填写密钥'}</span>
         </div>
-        <WeatherTile />
       </section>
 
       <div className="ov-grid">
         <div className="ov-col">
-          <section className="panel ov-card" aria-label="继续学习">
+          <section
+            className="panel ov-card anim-rise"
+            style={{ '--i': 3 } as CSSProperties}
+            aria-label="继续学习"
+          >
             <header className="ov-card__head">
               <h2 className="ov-card__title">继续学习</h2>
               {activeTutorial ? (
@@ -449,7 +472,11 @@ export function OverviewPage() {
             )}
           </section>
 
-          <section className="panel ov-card" aria-label="最近算法">
+          <section
+            className="panel ov-card anim-rise"
+            style={{ '--i': 4 } as CSSProperties}
+            aria-label="最近算法"
+          >
             <header className="ov-card__head">
               <h2 className="ov-card__title">最近算法</h2>
               <Link to="/algorithms" className="ov-link">
@@ -480,46 +507,12 @@ export function OverviewPage() {
               </ul>
             )}
           </section>
-
-          <AiNewsCard />
         </div>
 
         <div className="ov-rail">
-          <WeatherCard />
-          <ToutiaoCard />
+          <AiNewsCard index={5} />
         </div>
       </div>
-    </div>
-  )
-}
-
-/* 统计条里的天气块（迷你版） */
-function WeatherTile() {
-  const [state, setState] = useState(getWeatherState())
-  useEffect(() => subscribeWeather(() => setState(getWeatherState())), [])
-  useEffect(() => {
-    void ensureWeather().catch(() => undefined)
-  }, [])
-
-  const w = state.data
-  return (
-    <div className="stat-tile">
-      <div className="stat-tile__body">
-        <span className="stat-tile__label">
-          今日天气
-          {w ? (
-            <span className="stat-tile__icon">
-              <WeatherGlyph icon={w.icon} size={16} />
-            </span>
-          ) : null}
-        </span>
-        <span className="stat-tile__value">
-          {state.status === 'loading' ? '…' : w ? `${w.tempC}°C` : '—'}
-        </span>
-      </div>
-      <span className="stat-tile__sub">
-        {w ? `${w.city} · ${w.text}${w.aqiText ? ` · ${w.aqiText}` : ''}` : '获取中'}
-      </span>
     </div>
   )
 }

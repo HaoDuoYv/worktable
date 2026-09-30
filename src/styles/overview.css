@@ -411,6 +411,132 @@
   color: var(--signal);
 }
 
+/* —— 主页 HERO（每日简报：天气 + 今日热点置顶，见 docs/UIUX_REDESIGN.md §3.1） —— */
+
+.ov-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+
+.ov-hero__card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ov-hero__weather {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.ov-hero__weather-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ov-hero__weather-icon {
+  display: inline-flex;
+  color: var(--warn);
+  flex-shrink: 0;
+}
+
+.ov-hero__weather-num {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ov-hero__temp {
+  font-size: clamp(34px, 4vw, 44px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.ov-hero__weather-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+}
+
+.ov-hero__weather-text em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-hero__updated {
+  font-size: 11px;
+  color: var(--text-subtle);
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.ov-hero__weather-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ov-hero__placeholder {
+  display: flex;
+  align-items: center;
+  min-height: 96px;
+}
+
+/* 热榜 hero：rank 徽标放大，top3 热度渐变 */
+.ov-hero__hotlist .ov-hotlist {
+  gap: 12px;
+}
+
+.ov-hotlist__rank {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-subtle);
+  background: var(--panel-2);
+  transition: transform var(--dur-1, 150ms) var(--ease-spring, ease);
+}
+
+.ov-hotlist__rank.is-top {
+  color: #fff;
+  background: var(--heat-grad, linear-gradient(135deg, #f85149, #ff7b42));
+}
+
+.ov-hotlist__row:hover .ov-hotlist__rank {
+  transform: scale(1.12);
+}
+
+.ov-hotlist__heat {
+  font-size: 11px;
+  color: var(--warn);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 /* —— 设置页：分组导航布局 —— */
 
 .settings-layout {
@@ -452,6 +578,7 @@
   background: var(--panel-2);
   color: var(--text);
   font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .settings-content {
@@ -573,6 +700,11 @@
 /* —— 窄屏适配 —— */
 
 @media (max-width: 960px) {
+  .ov-hero {
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 16px;
+  }
+
   .ov-grid {
     grid-template-columns: minmax(0, 1fr);
   }
